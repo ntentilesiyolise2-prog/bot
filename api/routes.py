@@ -2,21 +2,15 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
 import json
-import base64
 
 router = APIRouter()
 
-# --- Schemas ---
 class TradeRequest(BaseModel):
     symbol: str
     side: str
     lot: float
     price: Optional[float] = None
 
-class QueryRequest(BaseModel):
-    question: str
-
-# --- Core Routes ---
 @router.get("/api/quotes")
 async def get_quotes():
     return {"symbols": []}
@@ -32,7 +26,7 @@ async def execute_trade(trade: TradeRequest):
     app = router.app
     order = trade.dict()
     result = await app.state.execution_core.execute_order(order)
-    if result.get('status') not in ['rejected', 'failed']:
+    if result.get('status') == 'executed':
         msg = f"✅ Trade Executed\nSymbol: {order['symbol']}\nSide: {order['side']}\nLot: {order['lot']}"
         await app.state.telegram.send_message(msg)
     return result
@@ -48,7 +42,17 @@ async def update_settings(settings: dict):
         json.dump(settings, f, indent=4)
     app = router.app
     app.state.config = settings
+    # Reinitialize auto‑trade state
+    app.state.engine.auto_trade_enabled = settings.get('ai', {}).get('auto_trade', True)
     return {"status": "updated"}
+
+@router.post("/api/auto_trade/toggle")
+async def toggle_auto_trade(enable: bool):
+    app = router.app
+    app.state.config['ai']['auto_trade'] = enable
+    with open('config.json', 'w') as f:
+        json.dump(app.state.config, f, indent=4)
+    return {"status": "ok", "auto_trade": enable}
 
 @router.get("/api/account")
 async def get_account():
@@ -65,46 +69,3 @@ async def get_positions():
     app = router.app
     broker = app.state.execution_core.broker
     return {"positions": getattr(broker, 'positions', [])}
-
-# --- Advanced Vision & AI Routes ---
-@router.post("/api/analyze_chart")
-async def analyze_chart(file: UploadFile = File(...)):
-    app = router.app
-    try:
-        from ai.vision.yolo_scanner import YOLOScanner
-        scanner = YOLOScanner()
-        image_bytes = await file.read()
-        results = scanner.scan(image_bytes)
-        return {"patterns": results}
-    except ImportError:
-        return {"error": "YOLO dependencies not installed."}
-    except Exception as e:
-        return {"error": str(e)}
-
-@router.post("/api/assistant/query")
-async def assistant_query(query: QueryRequest):
-    app = router.app
-    try:
-        from ai.assistant.rag_engine import RAGAssistant
-        assistant = RAGAssistant()
-        await assistant.initialize()
-        answer = await assistant.query(query.question)
-        return {"answer": answer}
-    except ImportError:
-        return {"answer": "Assistant dependencies not installed."}
-    except Exception as e:
-        return {"answer": f"Error: {str(e)}"}
-
-@router.post("/api/assistant/train_lstm")
-async def train_lstm(symbol: str = "BTCUSD", timeframe: str = "D1"):
-    app = router.app
-    try:
-        from ai.models.lstm_predictor import PricePredictor
-        df = await app.state.data_fabric.get_candles(symbol, timeframe, limit=2000)
-        if df.empty:
-            return {"status": "failed", "error": "No data fetched."}
-        predictor = PricePredictor()
-        predictor.train(df, epochs=10)  # Quick training for demo
-        return {"status": "success", "message": f"LSTM trained on {symbol}."}
-    except Exception as e:
-        return {"status": "failed", "error": str(e)}
