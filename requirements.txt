@@ -13,3 +13,8 @@ python-dotenv==1.0.0
 pydantic==2.5.0
 apscheduler==3.10.4
 aiohttp==3.9.1
+torch==2.1.2
+torchvision==0.16.2
+ultralytics==8.0.212
+chromadb==0.4.22
+opencv-python-headless==4.8.1.78
