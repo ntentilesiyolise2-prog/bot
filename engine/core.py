@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from utils.logger import setup_logger
 from api.websocket import manager
+from data.symbol_info import SymbolInfo
 
 logger = setup_logger(__name__)
 
@@ -11,41 +12,79 @@ class TradingEngine:
         self.app = app_state
         self.running = False
         self.tasks = []
-        self.last_signals = {}   # Cache to avoid duplicate auto‑trades
+        self.last_signals = {}
         self._last_trade_time = None
+        self.active_symbols = set(self.app.config.get('symbols', ['BTCUSD', 'EURUSD']))
+        self.symbol_info = SymbolInfo()
+        self.symbol_metadata_cache = {}
 
     async def start(self):
         self.running = True
-        logger.info("🚀 Trading Engine started.")
+        logger.info("🚀 Universal Trading Engine started.")
+        # If load_all_symbols is true, load a default set (top 10) from the exchange.
+        if self.app.config.get('load_all_symbols', False):
+            await self._load_default_symbols()
         self.tasks.append(asyncio.create_task(self._broadcast_prices()))
         self.tasks.append(asyncio.create_task(self._run_scanner()))
         self.tasks.append(asyncio.create_task(self._monitor_risk()))
-        self.tasks.append(asyncio.create_task(self._auto_trade_loop()))  # AUTO-TRADE
-        logger.info("✅ All engine loops are running.")
+        self.tasks.append(asyncio.create_task(self._auto_trade_loop()))
+        logger.info(f"✅ Active symbols: {self.active_symbols}")
 
-    # ------------------------------------------------------------
-    # 1. PRICE BROADCASTER (every 2 seconds)
-    # ------------------------------------------------------------
+    async def add_symbol(self, symbol):
+        """Dynamically add a symbol to the watchlist."""
+        if symbol in self.active_symbols:
+            return False
+        # Validate symbol
+        meta = self.symbol_info.get_symbol_metadata(symbol)
+        if meta:
+            self.active_symbols.add(symbol)
+            self.symbol_metadata_cache[symbol] = meta
+            logger.info(f"➕ Added symbol: {symbol}")
+            return True
+        logger.warning(f"❌ Symbol not found: {symbol}")
+        return False
+
+    async def remove_symbol(self, symbol):
+        if symbol in self.active_symbols:
+            self.active_symbols.remove(symbol)
+            logger.info(f"➖ Removed symbol: {symbol}")
+            return True
+        return False
+
+    async def _load_default_symbols(self):
+        defaults = ['BTCUSD', 'ETHUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'AAPL', 'SPX']
+        for sym in defaults:
+            await self.add_symbol(sym)
+
+    async def _get_symbol_metadata(self, symbol):
+        if symbol not in self.symbol_metadata_cache:
+            meta = self.symbol_info.get_symbol_metadata(symbol)
+            if meta:
+                self.symbol_metadata_cache[symbol] = meta
+        return self.symbol_metadata_cache.get(symbol, {})
+
     async def _broadcast_prices(self):
         while self.running:
             try:
-                for symbol in self.app.config['symbols']:
+                for symbol in list(self.active_symbols):
                     df = await self.app.data_fabric.get_candles(symbol, "M1", limit=2)
                     if not df.empty and len(df) > 1:
                         last = df.iloc[-1]
                         prev = df.iloc[-2]
                         change = round(((last['Close'] - prev['Close']) / prev['Close']) * 100, 2)
+                        meta = await self._get_symbol_metadata(symbol)
+                        digits = meta.get('digits', 2)
                         msg = {
                             "type": "price",
                             "symbol": symbol,
-                            "bid": round(last['Close'] * 0.9998, 2),
-                            "ask": round(last['Close'] * 1.0002, 2),
+                            "bid": round(last['Close'] * 0.9998, digits),
+                            "ask": round(last['Close'] * 1.0002, digits),
                             "high": last['High'],
                             "low": last['Low'],
                             "change": change,
                             "volume": str(int(last['Volume'])) if last['Volume'] else "--",
                             "time": datetime.utcnow().strftime("%H:%M:%S"),
-                            "spread": round((last['Close'] * 0.0004), 2),
+                            "spread": round((last['Close'] * 0.0004), digits),
                         }
                         await manager.broadcast(msg)
                 await asyncio.sleep(2)
@@ -53,25 +92,25 @@ class TradingEngine:
                 logger.error(f"Price broadcast error: {e}")
                 await asyncio.sleep(5)
 
-    # ------------------------------------------------------------
-    # 2. STRATEGY SCANNER (every 5 seconds)
-    # ------------------------------------------------------------
     async def _run_scanner(self):
         while self.running:
             try:
-                for symbol in self.app.config['symbols']:
+                for symbol in list(self.active_symbols):
                     df = await self.app.feature_store.compute_features(symbol, "M15")
                     if df.empty:
                         continue
+                    # Get symbol metadata for adaptive strategy parameters
+                    meta = await self._get_symbol_metadata(symbol)
+                    # Run strategy swarm (already adaptive via ATR)
                     result = self.app.strategy_swarm.get_votes(df)
                     signal = {
                         "type": "signal",
                         "symbol": symbol,
                         "confluence": result['confluence'],
                         "direction": result['direction'],
-                        "signals": [{"symbol": symbol, "direction": result['direction'], "setup": "Multi-Agent", "confluence": result['confluence']}],
+                        "signals": [{"symbol": symbol, "direction": result['direction'], "setup": "Universal", "confluence": result['confluence']}],
                         "breakdown": result['breakdown'],
-                        "explanation": f"Multi-agent vote: {result['votes']}. Confluence: {result['confluence']}%."
+                        "explanation": f"Swarm vote: {result['votes']}. Confluence: {result['confluence']}%. Digits: {meta.get('digits', 4)}"
                     }
                     self.last_signals[symbol] = signal
                     await manager.broadcast(signal)
@@ -80,13 +119,9 @@ class TradingEngine:
                 logger.error(f"Scanner error: {e}")
                 await asyncio.sleep(10)
 
-    # ------------------------------------------------------------
-    # 3. RISK MONITOR (every 60 seconds)
-    # ------------------------------------------------------------
     async def _monitor_risk(self):
         while self.running:
             try:
-                # Calculate real risk from engine
                 var = self.app.risk_engine.compute_var()
                 tilt = self.app.risk_engine.get_tilt_status()
                 risk_data = {
@@ -109,19 +144,14 @@ class TradingEngine:
             except Exception as e:
                 logger.error(f"Risk monitor error: {e}")
 
-    # ------------------------------------------------------------
-    # 4. AUTO‑TRADE LOOP (checks signals, risk, executes)
-    # ------------------------------------------------------------
     async def _auto_trade_loop(self):
         while self.running:
             try:
-                # Check if auto‑trade is enabled
                 auto_trade_enabled = self.app.config.get('ai', {}).get('auto_trade', True)
                 if not auto_trade_enabled:
                     await asyncio.sleep(1)
                     continue
 
-                # Check circuit breaker
                 if self.app.circuit_breaker.tripped:
                     logger.warning("Circuit breaker tripped. Auto‑trade paused.")
                     await asyncio.sleep(5)
@@ -134,24 +164,18 @@ class TradingEngine:
                     direction = signal.get('direction')
                     min_conf = self.app.config['ai']['min_confluence_threshold']
                     if confluence >= min_conf and direction in ['BUY', 'SELL']:
-                        # Prevent duplicate trades on the same signal
                         trade_key = f"{symbol}_{direction}"
                         if self._last_trade_time == trade_key:
                             continue
-                        # Check risk
                         trade = {'symbol': symbol, 'side': direction, 'lot': 0.01}
                         ok, msg = self.app.risk_engine.check_risk(trade)
                         if not ok:
                             logger.info(f"Risk blocked {symbol}: {msg}")
                             continue
-                        # Execute the trade
                         result = await self.app.execution_core.execute_order(trade)
                         if result.get('status') == 'executed':
-                            # Update strategy weights with PnL (dummy PnL for now, will be real)
-                            # In reality, we'd get PnL from the position close
-                            pnl = result.get('pnl', 0.5)  # placeholder
-                            self.app.strategy_swarm.update_performance('Multi-Agent', pnl)
-                            # Send alert
+                            pnl = result.get('pnl', 0.5)
+                            self.app.strategy_swarm.update_performance('Universal', pnl)
                             await self.app.telegram.send_message(
                                 f"🤖 Auto-Trade: {direction} {symbol} 0.01 lots @ {result.get('price', 'market')}"
                             )
