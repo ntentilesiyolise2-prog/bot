@@ -1,0 +1,25 @@
+{
+  "symbols": ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "USDJPY", "XAUUSD"],
+  "timeframes": ["M1", "M5", "M15", "M30", "H1", "H4", "D1"],
+  "risk": {
+    "max_daily_loss": 50.0,
+    "max_drawdown_pct": 5.0,
+    "risk_per_trade_pct": 2.0,
+    "max_consecutive_losses": 3,
+    "max_open_positions": 5,
+    "auto_hedge": false
+  },
+  "execution": {
+    "paper_trading": true,
+    "broker": "simulator",
+    "mt5_account": {
+      "login": 0,
+      "password": "",
+      "server": ""
+    }
+  },
+  "ai": {
+    "scanner_interval_sec": 5,
+    "min_confluence_threshold": 75
+  }
+}
