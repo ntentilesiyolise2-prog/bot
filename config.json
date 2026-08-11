@@ -1,5 +1,6 @@
 {
-  "symbols": ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "USDJPY", "XAUUSD"],
+  "symbols": [],
+  "load_all_symbols": true,
   "timeframes": ["M1", "M5", "M15", "M30", "H1", "H4", "D1"],
   "risk": {
     "max_daily_loss": 50.0,
@@ -20,6 +21,7 @@
   },
   "ai": {
     "scanner_interval_sec": 5,
-    "min_confluence_threshold": 75
+    "min_confluence_threshold": 75,
+    "auto_trade": true
   }
 }
