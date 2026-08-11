@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 
 from data.fabric import DataFabric
 from features.store import FeatureStore
-from strategies.swarm import StrategySwarm
+from strategies.adaptive_swarm import AdaptiveSwarm
 from risk.engine import RiskEngine
+from risk.circuit_breaker import CircuitBreaker
 from execution.core import ExecutionCore
 from api.routes import router as api_router
 from api.websocket import websocket_handler
@@ -41,11 +42,15 @@ with open('config.json', 'r') as f:
 app.state.config = config
 app.state.data_fabric = DataFabric()
 app.state.feature_store = FeatureStore(app.state.data_fabric)
-app.state.strategy_swarm = StrategySwarm()
+app.state.strategy_swarm = AdaptiveSwarm()          # <-- Multi‑agent swarm
 app.state.risk_engine = RiskEngine(config)
+app.state.circuit_breaker = CircuitBreaker(         # <-- Circuit breaker
+    max_daily_loss=config['risk']['max_daily_loss'],
+    consecutive_loss_limit=config['risk']['max_consecutive_losses']
+)
 app.state.execution_core = ExecutionCore(config)
-app.state.telegram = TelegramBot()          # <-- NEW
-app.state.engine = TradingEngine(app.state) # <-- NEW
+app.state.telegram = TelegramBot()
+app.state.engine = TradingEngine(app.state)        # <-- Full engine with auto‑trade
 
 # --- API & WebSocket ---
 app.include_router(api_router)
@@ -61,7 +66,7 @@ if frontend_path.exists():
 async def startup():
     logger.info("🚀 Starting NEXUS INFINITUM...")
     await app.state.execution_core.initialize()
-    await app.state.engine.start()  # <-- Starts price broadcaster, scanner, risk monitor
+    await app.state.engine.start()  # Starts all loops: price, scanner, risk, auto‑trade
     logger.info("✅ All systems ready. Engine is running.")
 
 @app.on_event("shutdown")
