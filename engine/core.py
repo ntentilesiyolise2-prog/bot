@@ -12,6 +12,7 @@ class TradingEngine:
         self.running = False
         self.tasks = []
         self.last_signals = {}   # Cache to avoid duplicate auto‑trades
+        self._last_trade_time = None
 
     async def start(self):
         self.running = True
@@ -19,7 +20,7 @@ class TradingEngine:
         self.tasks.append(asyncio.create_task(self._broadcast_prices()))
         self.tasks.append(asyncio.create_task(self._run_scanner()))
         self.tasks.append(asyncio.create_task(self._monitor_risk()))
-        self.tasks.append(asyncio.create_task(self._auto_trade_loop()))  # <-- AUTO-TRADE LOOP
+        self.tasks.append(asyncio.create_task(self._auto_trade_loop()))  # AUTO-TRADE
         logger.info("✅ All engine loops are running.")
 
     # ------------------------------------------------------------
@@ -68,11 +69,10 @@ class TradingEngine:
                         "symbol": symbol,
                         "confluence": result['confluence'],
                         "direction": result['direction'],
-                        "signals": [{"symbol": symbol, "direction": result['direction'], "setup": "Trend+ICT", "confluence": result['confluence']}],
+                        "signals": [{"symbol": symbol, "direction": result['direction'], "setup": "Multi-Agent", "confluence": result['confluence']}],
                         "breakdown": result['breakdown'],
-                        "explanation": f"Swarm vote: {result['votes']}. Confluence: {result['confluence']}%."
+                        "explanation": f"Multi-agent vote: {result['votes']}. Confluence: {result['confluence']}%."
                     }
-                    # Cache the signal for auto‑trade
                     self.last_signals[symbol] = signal
                     await manager.broadcast(signal)
                 await asyncio.sleep(self.app.config['ai']['scanner_interval_sec'])
@@ -86,10 +86,13 @@ class TradingEngine:
     async def _monitor_risk(self):
         while self.running:
             try:
+                # Calculate real risk from engine
+                var = self.app.risk_engine.compute_var()
+                tilt = self.app.risk_engine.get_tilt_status()
                 risk_data = {
                     "type": "risk",
-                    "var": "$42.18",
-                    "tilt": "NEUTRAL",
+                    "var": f"${var:.2f}",
+                    "tilt": tilt,
                     "gex": "+1.24M",
                     "vpin": "0.34",
                     "var_sub": "-3.27% equity",
@@ -107,18 +110,21 @@ class TradingEngine:
                 logger.error(f"Risk monitor error: {e}")
 
     # ------------------------------------------------------------
-    # 4. AUTO‑TRADE LOOP (checks signals & executes)  <-- THIS IS THE MISSING PIECE
+    # 4. AUTO‑TRADE LOOP (checks signals, risk, executes)
     # ------------------------------------------------------------
     async def _auto_trade_loop(self):
-        """Continuously check for signals and auto‑trade if conditions are met."""
         while self.running:
             try:
-                # Check if auto‑trade is enabled in the UI (we'll store the state in app.state)
-                # For now, we read it from config – but we'll also have a dynamic toggle later.
-                # I'll assume it's enabled by default; you can toggle it via the UI later.
+                # Check if auto‑trade is enabled
                 auto_trade_enabled = self.app.config.get('ai', {}).get('auto_trade', True)
                 if not auto_trade_enabled:
                     await asyncio.sleep(1)
+                    continue
+
+                # Check circuit breaker
+                if self.app.circuit_breaker.tripped:
+                    logger.warning("Circuit breaker tripped. Auto‑trade paused.")
+                    await asyncio.sleep(5)
                     continue
 
                 for symbol, signal in self.last_signals.items():
@@ -126,39 +132,39 @@ class TradingEngine:
                         continue
                     confluence = signal.get('confluence', 0)
                     direction = signal.get('direction')
-                    # Only trade if confluence is high enough and direction is clear
                     min_conf = self.app.config['ai']['min_confluence_threshold']
                     if confluence >= min_conf and direction in ['BUY', 'SELL']:
                         # Prevent duplicate trades on the same signal
                         trade_key = f"{symbol}_{direction}"
-                        if hasattr(self, '_last_trade_time') and self._last_trade_time == trade_key:
+                        if self._last_trade_time == trade_key:
                             continue
                         # Check risk
-                        trade = {'symbol': symbol, 'side': direction, 'lot': 0.01}  # Fixed lot for demo
+                        trade = {'symbol': symbol, 'side': direction, 'lot': 0.01}
                         ok, msg = self.app.risk_engine.check_risk(trade)
-                        if ok:
-                            result = await self.app.execution_core.execute_order(trade)
-                            if result.get('status') == 'executed':
-                                # Send Telegram alert
-                                await self.app.telegram.send_message(
-                                    f"🤖 Auto‑Trade: {direction} {symbol} 0.01 lots @ {result.get('price', 'market')}"
-                                )
-                                logger.info(f"Auto‑trade executed: {direction} {symbol}")
-                                # Mark this signal as used to avoid re‑entry
-                                self.last_signals[symbol] = None
-                                self._last_trade_time = trade_key
-                            else:
-                                logger.warning(f"Auto‑trade failed for {symbol}: {result}")
+                        if not ok:
+                            logger.info(f"Risk blocked {symbol}: {msg}")
+                            continue
+                        # Execute the trade
+                        result = await self.app.execution_core.execute_order(trade)
+                        if result.get('status') == 'executed':
+                            # Update strategy weights with PnL (dummy PnL for now, will be real)
+                            # In reality, we'd get PnL from the position close
+                            pnl = result.get('pnl', 0.5)  # placeholder
+                            self.app.strategy_swarm.update_performance('Multi-Agent', pnl)
+                            # Send alert
+                            await self.app.telegram.send_message(
+                                f"🤖 Auto-Trade: {direction} {symbol} 0.01 lots @ {result.get('price', 'market')}"
+                            )
+                            logger.info(f"✅ Auto-trade executed: {direction} {symbol}")
+                            self.last_signals[symbol] = None
+                            self._last_trade_time = trade_key
                         else:
-                            logger.info(f"Auto‑trade blocked for {symbol}: {msg}")
-                await asyncio.sleep(1)  # Check every second
+                            logger.warning(f"Auto-trade failed for {symbol}: {result}")
+                await asyncio.sleep(1)
             except Exception as e:
-                logger.error(f"Auto‑trade loop error: {e}")
+                logger.error(f"Auto-trade loop error: {e}")
                 await asyncio.sleep(5)
 
-    # ------------------------------------------------------------
-    # 5. SHUTDOWN
-    # ------------------------------------------------------------
     async def stop(self):
         self.running = False
         for task in self.tasks:
