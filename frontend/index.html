@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>NEXUS INFINITUM</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    /* ---- RESET & BASE ---- */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { height:100%; background:#0A0E17; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif; color:#FFFFFF; overflow:hidden; -webkit-tap-highlight-color:transparent; user-select:none; }
+    #root { height:100%; max-width:480px; margin:0 auto; background:#0A0E17; display:flex; flex-direction:column; position:relative; box-shadow:0 0 40px rgba(0,0,0,0.8); }
+    /* ---- SCROLLBAR ---- */
+    ::-webkit-scrollbar { width:3px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#2C2C2E; border-radius:10px; }
+    /* ---- HEADER ---- */
+    .header { height:44px; background:#0A0E17; display:flex; align-items:center; justify-content:space-between; padding:0 12px; border-bottom:1px solid #1C1C1E; flex-shrink:0; }
+    .header-back { color:#007AFF; font-size:17px; font-weight:400; cursor:pointer; min-width:60px; }
+    .header-title { font-size:15px; font-weight:600; text-align:center; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .header-actions { display:flex; align-items:center; gap:8px; min-width:60px; justify-content:flex-end; }
+    .header-actions svg { width:22px; height:22px; stroke:#8E8E93; cursor:pointer; transition:stroke 0.2s; }
+    .header-actions svg.active { stroke:#00D4FF; }
+    .header-actions svg:hover { stroke:#FFFFFF; }
+    /* ---- TAB BAR ---- */
+    .tab-bar { height:64px; background:#0A0E17; border-top:1px solid #1C1C1E; display:flex; align-items:flex-start; justify-content:space-around; flex-shrink:0; padding-top:6px; }
+    .tab-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; transition:opacity 0.1s; }
+    .tab-item svg { width:24px; height:24px; stroke:#8E8E93; transition:stroke 0.2s; }
+    .tab-item.active svg { stroke:#00D4FF; }
+    .tab-item span { font-size:10px; color:#8E8E93; transition:color 0.2s; }
+    .tab-item.active span { color:#00D4FF; }
+    .tab-item .badge { position:absolute; top:-4px; right:-8px; background:#FF3B30; color:white; font-size:9px; min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 4px; font-weight:600; }
+    /* ---- CONTENT AREA ---- */
+    .content { flex:1; overflow:hidden; position:relative; background:#0A0E17; }
+    .tab-page { display:none; height:100%; overflow-y:auto; padding-bottom:4px; }
+    .tab-page.active { display:block; }
+    /* ---- QUOTES TAB ---- */
+    .quotes-search { padding:8px 12px; background:#0A0E17; border-bottom:1px solid #1C1C1E; }
+    .quotes-search input { width:100%; height:36px; background:#1C1C1E; border:none; border-radius:10px; padding:0 12px; font-size:15px; color:#FFFFFF; outline:none; }
+    .quotes-search input::placeholder { color:#8E8E93; }
+    .quotes-header { display:flex; padding:6px 12px; font-size:10px; color:#8E8E93; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #1C1C1E; background:#101010; }
+    .quotes-header > div { flex:1; }
+    .quotes-row { display:flex; align-items:center; padding:8px 12px; border-bottom:1px solid #1C1C1E; background:#0A0E17; transition:background 0.15s; cursor:pointer; }
+    .quotes-row:active { background:#1C1C1E; }
+    .quotes-row .symbol { flex:1.2; }
+    .quotes-row .symbol .name { font-size:15px; font-weight:600; }
+    .quotes-row .symbol .change { font-size:11px; font-weight:400; margin-left:6px; }
+    .quotes-row .time { flex:0.8; font-size:10px; color:#8E8E93; text-align:center; font-feature-settings:'tnum'; }
+    .quotes-row .bidask { flex:1.2; text-align:right; font-size:16px; font-weight:500; line-height:1.2; }
+    .quotes-row .bidask .ask { font-size:13px; color:#8E8E93; font-weight:400; }
+    .quotes-row .spread { flex:0.6; font-size:10px; color:#8E8E93; text-align:center; }
+    .quotes-row .volume { flex:0.6; font-size:10px; color:#8E8E93; text-align:right; }
+    .quotes-row .edge { flex:0.8; text-align:right; font-size:16px; font-weight:700; }
+    .quotes-row .edge .bar { width:100%; height:2px; background:#2C2C2E; border-radius:2px; margin-top:2px; overflow:hidden; }
+    .quotes-row .edge .bar .fill { height:100%; border-radius:2px; transition:width 0.3s; }
+    .quotes-row .atlas { flex:0.4; text-align:center; font-size:10px; font-weight:700; }
+    .quotes-row .atlas span { display:inline-block; width:18px; height:18px; border-radius:4px; line-height:18px; text-align:center; color:#000; font-weight:700; font-size:11px; }
+    .quotes-group { padding:6px 12px; background:#101010; font-size:12px; font-weight:600; color:#8E8E93; border-bottom:1px solid #1C1C1E; cursor:pointer; display:flex; justify-content:space-between; }
+    .quotes-group .count { font-weight:400; color:#636366; }
+    /* ---- CHART TAB ---- */
+    .chart-container { height:100%; display:flex; flex-direction:column; }
+    .chart-timeframes { display:flex; padding:4px 8px; gap:2px; background:#0A0E17; border-bottom:1px solid #1C1C1E; overflow-x:auto; flex-shrink:0; }
+    .chart-timeframes button { min-width:38px; height:28px; border-radius:6px; border:none; background:transparent; color:#8E8E93; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; }
+    .chart-timeframes button.active { background:#007AFF; color:white; }
+    .chart-wrapper { flex:1; position:relative; background:#0A0E17; min-height:200px; }
+    .chart-wrapper canvas { width:100%; height:100%; display:block; }
+    .chart-overlays { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+    .chart-ohlc { display:flex; padding:4px 12px; font-size:11px; color:#8E8E93; background:#0A0E17; border-top:1px solid #1C1C1E; flex-shrink:0; gap:12px; }
+    .chart-ohlc b { color:white; font-weight:500; }
+    .chart-panel { background:#0A0E17; border-bottom:1px solid #1C1C1E; flex-shrink:0; }
+    .chart-panel-header { display:flex; align-items:center; justify-content:space-between; padding:0 12px; height:36px; cursor:pointer; }
+    .chart-panel-header .label { font-size:12px; font-weight:600; letter-spacing:0.5px; color:#8E8E93; display:flex; align-items:center; gap:6px; }
+    .chart-panel-header .label svg { width:14px; height:14px; stroke:#AF52DE; }
+    .chart-panel-header .arrow { transition:transform 0.2s; }
+    .chart-panel-header .arrow.open { transform:rotate(90deg); }
+    .chart-panel-body { padding:0 12px 12px; display:none; }
+    .chart-panel-body.open { display:block; }
+    .chart-scan-buttons { display:flex; gap:8px; margin-bottom:8px; }
+    .chart-scan-buttons button { flex:1; height:32px; border-radius:8px; border:none; background:#1C1C1E; color:white; font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:background 0.15s; }
+    .chart-scan-buttons button:active { background:#2C2C2E; }
+    .chart-scan-buttons button.primary { background:#AF52DE; }
+    .chart-scan-buttons button.primary:active { background:#8E44B9; }
+    .chart-scan-signals { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-bottom:8px; }
+    .chart-signal-card { background:#1C1C1E; border-radius:8px; padding:8px; border:1px solid #2C2C2E; }
+    .chart-signal-card .top { display:flex; justify-content:space-between; align-items:center; }
+    .chart-signal-card .sym { font-size:11px; font-weight:700; }
+    .chart-signal-card .dir { font-size:9px; padding:0 4px; border-radius:2px; font-weight:600; }
+    .chart-signal-card .dir.long { background:#32D74B; color:black; }
+    .chart-signal-card .dir.short { background:#FF3B30; color:white; }
+    .chart-signal-card .setup { font-size:10px; color:#8E8E93; margin-top:2px; }
+    .chart-signal-card .conf { font-size:13px; font-weight:700; color:#32D74B; margin-top:2px; }
+    .chart-confidence { display:flex; gap:6px; margin-bottom:8px; align-items:center; }
+    .chart-confidence .bar { flex:1; height:6px; background:#2C2C2E; border-radius:3px; overflow:hidden; display:flex; }
+    .chart-confidence .bar .seg { height:100%; }
+    .chart-confidence .labels { display:flex; justify-content:space-between; font-size:9px; color:#8E8E93; }
+    .chart-overlay-toggles { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+    .chart-overlay-toggles label { display:flex; align-items:center; gap:4px; background:#1C1C1E; border:1px solid #2C2C2E; border-radius:14px; padding:2px 10px; height:24px; cursor:pointer; font-size:10px; }
+    .chart-overlay-toggles input[type="checkbox"] { width:12px; height:12px; accent-color:#007AFF; }
+    .chart-auto-trade { display:flex; align-items:center; gap:8px; margin-top:4px; }
+    .chart-auto-trade label { font-size:12px; color:#8E8E93; display:flex; align-items:center; gap:6px; cursor:pointer; }
+    .chart-auto-trade input[type="checkbox"] { width:16px; height:16px; accent-color:#007AFF; }
+    .chart-oracle { position:absolute; bottom:12px; right:12px; left:12px; background:rgba(10,14,23,0.9); backdrop-filter:blur(10px); border:1px solid #2C2C2E; border-radius:12px; padding:10px 14px; font-size:12px; color:#8E8E93; pointer-events:auto; max-width:80%; margin-left:auto; }
+    .chart-oracle .label { font-weight:600; color:#AF52DE; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; }
+    .chart-oracle .text { color:white; margin-top:2px; }
+    /* ---- TRADE TAB ---- */
+    .trade-account { background:#1C1C1E; padding:12px; border-bottom:1px solid #2C2C2E; }
+    .trade-account .top { display:flex; justify-content:space-between; align-items:baseline; }
+    .trade-account .top .currency { font-size:28px; font-weight:700; }
+    .trade-account .top .leverage { font-size:13px; color:#8E8E93; }
+    .trade-account .stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:8px; }
+    .trade-account .stats div { font-size:12px; color:#8E8E93; }
+    .trade-account .stats div .val { font-size:16px; font-weight:600; color:white; }
+    .trade-account .stats div .val.green { color:#32D74B; }
+    .trade-risk { padding:12px; }
+    .trade-risk .title { font-size:11px; color:#8E8E93; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+    .trade-risk .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .trade-risk .grid .card { background:#1C1C1E; border:1px solid #2C2C2E; border-radius:12px; padding:10px; }
+    .trade-risk .grid .card .label { font-size:10px; color:#8E8E93; text-transform:uppercase; }
+    .trade-risk .grid .card .val { font-size:16px; font-weight:700; margin-top:2px; }
+    .trade-risk .grid .card .sub { font-size:10px; color:#8E8E93; margin-top:2px; }
+    .trade-risk .grid .card .bar { height:3px; background:#2C2C2E; border-radius:2px; margin-top:6px; overflow:hidden; }
+    .trade-risk .grid .card .bar .fill { height:100%; border-radius:2px; }
+    .trade-positions { padding:12px; }
+    .trade-positions .pos-item { background:#1C1C1E; border:1px solid #2C2C2E; border-radius:12px; padding:10px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+    .trade-positions .pos-item .left .sym { font-weight:600; }
+    .trade-positions .pos-item .left .detail { font-size:11px; color:#8E8E93; }
+    .trade-positions .pos-item .right .pnl { font-weight:600; }
+    /* ---- HISTORY TAB ---- */
+    .history-tabs { display:flex; background:#1C1C1E; padding:4px; border-radius:10px; margin:8px 12px; }
+    .history-tabs button { flex:1; height:28px; border-radius:6px; border:none; background:transparent; color:#8E8E93; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; }
+    .history-tabs button.active { background:#2C2C2E; color:white; }
+    .history-stats { display:flex; justify-content:space-around; background:#1C1C1E; border-radius:12px; padding:10px; margin:0 12px 8px; }
+    .history-stats div { text-align:center; font-size:11px; color:#8E8E93; }
+    .history-stats div .val { font-size:15px; font-weight:700; color:white; display:block; }
+    .history-list { padding:0 12px; }
+    .history-item { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #1C1C1E; }
+    .history-item .left .symbol { font-weight:600; }
+    .history-item .left .meta { font-size:11px; color:#8E8E93; }
+    .history-item .right .pnl { font-weight:600; }
+    /* ---- SETTINGS TAB ---- */
+    .settings-section { padding:12px; border-bottom:1px solid #1C1C1E; }
+    .settings-section .title { font-size:13px; color:#8E8E93; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; }
+    .settings-item { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #1C1C1E; }
+    .settings-item:last-child { border-bottom:none; }
+    .settings-item .label { font-size:15px; }
+    .settings-item .value { font-size:13px; color:#8E8E93; display:flex; align-items:center; gap:6px; }
+    .settings-item .value svg { width:16px; height:16px; stroke:#8E8E93; }
+    .settings-item input[type="text"] { background:#1C1C1E; border:1px solid #2C2C2E; border-radius:6px; padding:4px 8px; color:white; font-size:13px; width:140px; }
+    .settings-item .toggle { width:44px; height:24px; border-radius:12px; background:#3A3A3C; cursor:pointer; transition:background 0.2s; position:relative; }
+    .settings-item .toggle.active { background:#32D74B; }
+    .settings-item .toggle .knob { width:20px; height:20px; background:white; border-radius:50%; position:absolute; top:2px; left:2px; transition:transform 0.2s; }
+    .settings-item .toggle.active .knob { transform:translateX(20px); }
+    /* ---- HAMBURGER MENU ---- */
+    .hamburger-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:100; display:none; }
+    .hamburger-overlay.open { display:block; }
+    .hamburger-panel { position:fixed; top:0; right:0; width:300px; max-width:80%; height:100%; background:#0A0E17; box-shadow:-4px 0 30px rgba(0,0,0,0.8); padding:20px; overflow-y:auto; z-index:101; transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .hamburger-panel.open { transform:translateX(0); }
+    .hamburger-panel .close { text-align:right; font-size:22px; cursor:pointer; color:#8E8E93; }
+    .hamburger-panel .title { font-size:18px; font-weight:700; margin-top:10px; }
+    .hamburger-panel .version { font-size:11px; color:#8E8E93; margin-bottom:20px; }
+    .hamburger-panel .group { margin-top:16px; }
+    .hamburger-panel .group .group-title { font-size:11px; color:#8E8E93; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+    .hamburger-panel .item { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #1C1C1E; cursor:pointer; transition:background 0.1s; }
+    .hamburger-panel .item:active { background:#1C1C1E; }
+    .hamburger-panel .item svg { width:20px; height:20px; stroke:#8E8E93; }
+    .hamburger-panel .item .text { flex:1; font-size:14px; }
+    .hamburger-panel .item .status { font-size:11px; color:#8E8E93; }
+    .hamburger-panel .item .status.on { color:#32D74B; }
+    .hamburger-panel .item .status.off { color:#FF3B30; }
+    /* ---- CONNECTION STATUS ---- */
+    .connection-status { position:absolute; top:8px; right:50px; width:8px; height:8px; border-radius:50%; background:#32D74B; box-shadow:0 0 8px #32D74B; transition:all 0.3s; z-index:10; }
+    .connection-status.disconnected { background:#FF3B30; box-shadow:0 0 8px #FF3B30; }
+    /* ---- TOAST ---- */
+    .toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); border:1px solid #2C2C2E; border-radius:12px; padding:10px 20px; color:white; font-size:14px; z-index:200; display:none; max-width:90%; text-align:center; }
+    .toast.show { display:block; animation: fadeUp 0.3s ease; }
+    @keyframes fadeUp { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+    /* ---- RESPONSIVE ---- */
+    @media (max-width: 480px) { .header-title { font-size:14px; } .quotes-row .bidask { font-size:14px; } }
+    @media (max-height: 700px) { .chart-panel-body { padding-bottom:4px; } .chart-scan-signals { gap:4px; } }
+    /* ---- LOADING ---- */
+    .loading-spinner { display:flex; align-items:center; justify-content:center; height:100%; color:#8E8E93; font-size:14px; flex-direction:column; gap:12px; }
+    .spinner { width:30px; height:30px; border:3px solid #2C2C2E; border-top-color:#007AFF; border-radius:50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-back" id="headerBack">‹ Quotes</div>
+      <div class="header-title" id="headerTitle">BTCUSD M15</div>
+      <div class="header-actions">
+        <svg id="voiceToggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+        <svg id="hamburgerToggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      </div>
+      <div class="connection-status" id="connStatus"></div>
+    </div>
+
+    <!-- Content -->
+    <div class="content" id="content">
+      <!-- Quotes Tab -->
+      <div class="tab-page active" id="tab-quotes">
+        <div class="quotes-search">
+          <input type="text" id="searchInput" placeholder="Enter symbol for search">
+        </div>
+        <div class="quotes-header">
+          <div>Symbol</div>
+          <div style="text-align:center;">Time</div>
+          <div style="text-align:right;">Bid/Ask</div>
+          <div style="text-align:center;">Spread</div>
+          <div style="text-align:right;">Volume</div>
+          <div style="text-align:right;">Edge</div>
+          <div style="text-align:center;">Atlas</div>
+        </div>
+        <div id="quotesList"></div>
+        <div class="quotes-group" id="groupsContainer"></div>
+      </div>
+
+      <!-- Chart Tab -->
+      <div class="tab-page" id="tab-chart">
+        <div class="chart-container">
+          <div class="chart-timeframes" id="timeframes"></div>
+          <div class="chart-panel">
+            <div class="chart-panel-header" id="scannerToggle">
+              <div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg> AI CHART SCANNER 1000 <span style="background:#AF52DE;color:white;font-size:9px;padding:0 6px;border-radius:4px;margin-left:4px;">LIVE</span></div>
+              <svg class="arrow open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="m9 18 6-6-6-6"/></svg>
+            </div>
+            <div class="chart-panel-body open" id="scannerBody">
+              <div class="chart-scan-buttons">
+                <button id="scanChartBtn">📷 Scan Chart</button>
+                <button id="pasteHint" style="background:transparent;color:#8E8E93;font-size:11px;flex:0.5;">or Paste (Ctrl+V)</button>
+              </div>
+              <div class="chart-scan-signals" id="topSignals"></div>
+              <div class="chart-confidence" id="confidenceBreakdown">
+                <div class="bar" id="confBar"><div class="seg" style="width:0%;background:#00D4FF;"></div><div class="seg" style="width:0%;background:#007AFF;"></div><div class="seg" style="width:0%;background:#AF52DE;"></div><div class="seg" style="width:0%;background:#32D74B;"></div></div>
+                <span style="font-size:11px;color:#8E8E93;" id="confLabel">0%</span>
+              </div>
+              <div class="chart-overlay-toggles">
+                <label><input type="checkbox" checked> Order Blocks</label>
+                <label><input type="checkbox" checked> FVG</label>
+                <label><input type="checkbox"> Liq Sweeps</label>
+                <label><input type="checkbox" checked> Killzones</label>
+                <label><input type="checkbox"> Ghost Cone</label>
+              </div>
+              <div class="chart-auto-trade">
+                <label><input type="checkbox" id="autoTradeToggle"> Auto‑Trade</label>
+                <span style="font-size:10px;color:#8E8E93;margin-left:auto;">Min confl.: 75%</span>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrapper" id="chartWrapper">
+            <canvas id="chartCanvas"></canvas>
+            <div class="chart-oracle" id="oracleWhisper">
+              <div class="label">Oracle Whisper</div>
+              <div class="text">Awaiting signal...</div>
+            </div>
+          </div>
+          <div class="chart-ohlc">
+            <span>O <b id="ohlcO">--</b></span>
+            <span>H <b id="ohlcH">--</b></span>
+            <span>L <b id="ohlcL">--</b></span>
+            <span>C <b id="ohlcC">--</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trade Tab -->
+      <div class="tab-page" id="tab-trade">
+        <div class="trade-account" id="accountSummary">
+          <div class="top">
+            <span class="currency">USD</span>
+            <span class="leverage">Leverage 1:500</span>
+          </div>
+          <div class="stats">
+            <div>Balance <span class="val" id="balanceVal">0.00</span></div>
+            <div>Equity <span class="val" id="equityVal">0.00</span></div>
+            <div>Free Margin <span class="val green" id="freeMarginVal">0.00</span></div>
+          </div>
+        </div>
+        <div class="trade-risk">
+          <div class="title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.5 12"/></svg> RISK SINGULARITY CORE <span style="background:#32D74B;color:black;font-size:9px;padding:0 6px;border-radius:10px;">ONLINE</span></div>
+          <div class="grid" id="riskGrid"></div>
+          <div style="margin-top:8px;background:#1C1C1E;border-radius:12px;padding:10px;border:1px solid #2C2C2E;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;"><span>LEV Engine • Dream Mode</span><span style="color:#8E8E93;">Gen 847 • Fitness 0.94</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;margin-top:4px;gap:4px;">
+              <div><div style="font-weight:700;font-size:14px;">1,284</div><div style="font-size:9px;color:#8E8E93;">SIMS RUN</div></div>
+              <div><div style="font-weight:700;font-size:14px;color:#32D74B;">+3.2%</div><div style="font-size:9px;color:#8E8E93;">EDGE BOOST</div></div>
+              <div><div style="font-weight:700;font-size:14px;">0.02s</div><div style="font-size:9px;color:#8E8E93;">LATENCY</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="trade-positions" id="activePositions">
+          <div style="font-size:12px;color:#8E8E93;margin-bottom:6px;">Active Positions</div>
+          <div id="positionsList"></div>
+        </div>
+      </div>
+
+      <!-- History Tab -->
+      <div class="tab-page" id="tab-history">
+        <div class="history-tabs" id="historyTabs">
+          <button class="active" data-tab="positions">Positions</button>
+          <button data-tab="orders">Orders</button>
+          <button data-tab="deals">Deals</button>
+        </div>
+        <div class="history-stats" id="historyStats">
+          <div>WIN RATE <span class="val" id="winRate">--</span></div>
+          <div>PROFIT FACTOR <span class="val" id="profitFactor">--</span></div>
+          <div>LEV SCORE AVG <span class="val" id="levScoreAvg">--</span></div>
+          <div>EXPECTANCY <span class="val" id="expectancy">--</span></div>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="tab-page" id="tab-settings">
+        <div class="settings-section">
+          <div class="title">Account</div>
+          <div class="settings-item"><span class="label">318345018 - XMGlobal-MT5 7</span><span class="value">Access Server UK <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">New Account</span><span class="value">+</span></div>
+          <div class="settings-item"><span class="label">Mailbox</span><span class="value">2 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">News</span><span class="value"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">Tradays Economic Calendar</span><span class="value"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">Chat and Messages</span><span class="value">2 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">Traders Community</span><span class="value"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">MQL5 Algo Trading</span><span class="value"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">OTP</span><span class="value"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">Interface</span><span class="value">English <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">Charts</span><span class="value"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+          <div class="settings-item"><span class="label">Journal</span><span class="value"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+        </div>
+        <div class="settings-section">
+          <div class="title">Telegram</div>
+          <div class="settings-item"><span class="label">Bot Token</span><input type="text" id="telegramToken" placeholder="Enter token"></div>
+          <div class="settings-item"><span class="label">Channel ID</span><input type="text" id="telegramChannel" placeholder="Enter channel ID"></div>
+          <div class="settings-item"><span class="label">Enable Alerts</span><div class="toggle active" id="telegramToggle"><div class="knob"></div></div></div>
+        </div>
+        <div class="settings-section">
+          <div class="title">Bot Customisation</div>
+          <div class="settings-item"><span class="label">Bot Name</span><input type="text" id="botName" value="NEXUS INFINITUM"></div>
+          <div class="settings-item"><span class="label">Candle Colours</span><span class="value">Custom <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span></div>
+        </div>
+        <div class="settings-section">
+          <div class="title">System</div>
+          <div class="settings-item"><span class="label">Version</span><span class="value">v2.0.0</span></div>
+          <div class="settings-item"><span class="label">Uptime</span><span class="value" id="uptime">--</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar" id="tabBar">
+      <div class="tab-item active" data-tab="quotes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <span>Quotes</span>
+      </div>
+      <div class="tab-item" data-tab="chart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        <span>Chart</span>
+      </div>
+      <div class="tab-item" data-tab="trade">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <span>Trade</span>
+      </div>
+      <div class="tab-item" data-tab="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.5 12"/></svg>
+        <span>History</span>
+      </div>
+      <div class="tab-item" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>
+        <span>Settings</span>
+        <span class="badge">2</span>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Hamburger Overlay -->
+    <div class="hamburger-overlay" id="hamburgerOverlay"></div>
+    <div class="hamburger-panel" id="hamburgerPanel">
+      <div class="close" id="hamburgerClose">✕</div>
+      <div class="title">NEXUS INFINITUM</div>
+      <div class="version">v2.0.0</div>
+      <div class="group">
+        <div class="group-title">Analytics</div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg><span class="text">AI Decision Visualiser</span></div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10z"/><path d="M12 6v6l4 2"/></svg><span class="text">Sentiment Heatmap</span></div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span class="text">Correlation Matrix</span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">Tools</div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg><span class="text">What If Simulator</span></div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><span class="text">Bot vs. Human Comparison</span></div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="text">Import / Export Settings</span></div>
+      </div>
+      <div class="group">
+        <div class="group-title">System</div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span class="text">Recovery Mode Status</span><span class="status on">Active</span></div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="text">Daily Briefing Archive</span></div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg><span class="text">Voice Assistant</span><span class="status on">ON</span></div>
+        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg><span class="text">System Diagnostics</span></div>
+      </div>
+      <div class="item" style="border-bottom:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="text">Share App (Add to Home Screen)</span></div>
+    </div>
+  </div>
+  <script>
+    // ---- Global State ----
+    let currentTab = 'quotes';
+    let currentSymbol = 'BTCUSD';
+    let currentTimeframe = 'M15';
+    let scannerOpen = true;
+    let ws = null;
+    let reconnectAttempts = 0;
+    const toast = document.getElementById('toast');
+    let toastTimer = null;
+
+    // ---- WebSocket ----
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.hostname || 'localhost';
+      const port = 8000;
+      ws = new WebSocket(`${protocol}//${host}:${port}/ws`);
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        setConnectionStatus(true);
+        reconnectAttempts = 0;
+        // Subscribe to symbols
+        ws.send(JSON.stringify({ action: 'subscribe', symbols: ['BTCUSD','ETHUSD','EURUSD','GBPUSD','USDJPY','XAUUSD','AAPL','SPX'] }));
+      };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleWebSocketMessage(data);
+        } catch (e) { console.warn('WS parse error', e); }
+      };
+      ws.onclose = () => {
+        console.warn('WebSocket disconnected');
+        setConnectionStatus(false);
+        scheduleReconnect();
+      };
+      ws.onerror = (err) => {
+        console.error('WebSocket error', err);
+        ws.close();
+      };
+    }
+
+    function scheduleReconnect() {
+      if (reconnectAttempts < 10) {
+        setTimeout(connectWebSocket, 2000 * (reconnectAttempts + 1));
+        reconnectAttempts++;
+      }
+    }
+
+    function setConnectionStatus(connected) {
+      const dot = document.getElementById('connStatus');
+      if (connected) {
+        dot.className = 'connection-status';
+      } else {
+        dot.className = 'connection-status disconnected';
+      }
+    }
+
+    function handleWebSocketMessage(data) {
+      switch (data.type) {
+        case 'price':
+          updateQuote(data);
+          break;
+        case 'signal':
+          updateScanner(data);
+          break;
+        case 'account':
+          updateAccount(data);
+          break;
+        case 'position':
+          updatePositions(data);
+          break;
+        case 'risk':
+          updateRisk(data);
+          break;
+        case 'history':
+          updateHistory(data);
+          break;
+        case 'notification':
+          showToast(data.message);
+          break;
+        default:
+          // ignore
+      }
+    }
+
+    // ---- UI Updates ----
+    function updateQuote(data) {
+      // find row and update fields
+      const rows = document.querySelectorAll('.quotes-row');
+      for (let row of rows) {
+        if (row.dataset.symbol === data.symbol) {
+          const bidask = row.querySelector('.bidask');
+          bidask.innerHTML = `<div>${data.bid}</div><div class="ask">${data.ask}</div>`;
+          const time = row.querySelector('.time');
+          time.textContent = data.time || '--';
+          const spread = row.querySelector('.spread');
+          spread.textContent = data.spread ? data.spread.toFixed(1) : '--';
+          const volume = row.querySelector('.volume');
+          volume.textContent = data.volume || '--';
+          const edge = row.querySelector('.edge .score');
+          if (edge) edge.textContent = data.confluence || '--';
+          const bar = row.querySelector('.edge .bar .fill');
+          if (bar) bar.style.width = (data.confluence || 0) + '%';
+          const change = row.querySelector('.symbol .change');
+          if (change) {
+            change.textContent = (data.change || 0).toFixed(2) + '%';
+            change.style.color = data.change >= 0 ? '#32D74B' : '#FF3B30';
+          }
+          break;
+        }
+      }
+    }
+
+    function updateScanner(data) {
+      // top signals
+      const container = document.getElementById('topSignals');
+      if (data.signals && data.signals.length) {
+        container.innerHTML = data.signals.slice(0,3).map(s => `
+          <div class="chart-signal-card">
+            <div class="top">
+              <span class="sym">${s.symbol}</span>
+              <span class="dir ${s.direction === 'LONG' ? 'long' : 'short'}">${s.direction}</span>
+            </div>
+            <div class="setup">${s.setup || '--'}</div>
+            <div class="conf">${s.confluence}% confluence</div>
+          </div>
+        `).join('');
+      }
+      // confidence breakdown
+      const confBar = document.getElementById('confBar');
+      const confLabel = document.getElementById('confLabel');
+      if (data.breakdown) {
+        const segs = confBar.querySelectorAll('.seg');
+        const total = data.breakdown.technical + data.breakdown.ict + data.breakdown.vision + data.breakdown.sentiment || 100;
+        segs[0].style.width = (data.breakdown.technical / total * 100) + '%';
+        segs[1].style.width = (data.breakdown.ict / total * 100) + '%';
+        segs[2].style.width = (data.breakdown.vision / total * 100) + '%';
+        segs[3].style.width = (data.breakdown.sentiment / total * 100) + '%';
+        confLabel.textContent = Math.round(data.confluence) + '%';
+      }
+      // Oracle whisper
+      if (data.explanation) {
+        document.querySelector('.chart-oracle .text').textContent = data.explanation;
+      }
+    }
+
+    function updateAccount(data) {
+      document.getElementById('balanceVal').textContent = data.balance || '0.00';
+      document.getElementById('equityVal').textContent = data.equity || '0.00';
+      document.getElementById('freeMarginVal').textContent = data.free_margin || '0.00';
+    }
+
+    function updatePositions(data) {
+      const list = document.getElementById('positionsList');
+      if (data.positions && data.positions.length) {
+        list.innerHTML = data.positions.map(p => `
+          <div class="pos-item">
+            <div class="left">
+              <div class="sym">${p.symbol} ${p.side}</div>
+              <div class="detail">${p.lot} lots @ ${p.entry_price}</div>
+            </div>
+            <div class="right">
+              <div class="pnl" style="color:${p.pnl >= 0 ? '#32D74B' : '#FF3B30'}">${p.pnl >= 0 ? '+' : ''}${p.pnl}</div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        list.innerHTML = '<div style="text-align:center;color:#8E8E93;padding:20px;">No active positions</div>';
+      }
+    }
+
+    function updateRisk(data) {
+      const grid = document.getElementById('riskGrid');
+      const items = [
+        { label: 'VaR (1D 99%)', val: data.var || '$0.00', sub: data.var_sub || '', color: '#FF3B30', pct: data.var_pct || 0 },
+        { label: 'Tilt Status', val: data.tilt || 'NEUTRAL', sub: data.tilt_sub || '', color: '#32D74B', pct: data.tilt_pct || 0 },
+        { label: 'GEX Exposure', val: data.gex || '0', sub: data.gex_sub || '', color: '#007AFF', pct: data.gex_pct || 0 },
+        { label: 'VPIN Toxicity', val: data.vpin || '0.00', sub: data.vpin_sub || '', color: '#32D74B', pct: data.vpin_pct || 0 }
+      ];
+      grid.innerHTML = items.map(item => `
+        <div class="card">
+          <div class="label">${item.label}</div>
+          <div class="val" style="color:${item.color}">${item.val}</div>
+          <div class="sub">${item.sub}</div>
+          <div class="bar"><div class="fill" style="width:${item.pct}%;background:${item.color};"></div></div>
+        </div>
+      `).join('');
+    }
+
+    function updateHistory(data) {
+      // Update stats
+      document.getElementById('winRate').textContent = data.win_rate || '--';
+      document.getElementById('profitFactor').textContent = data.profit_factor || '--';
+      document.getElementById('levScoreAvg').textContent = data.lev_score || '--';
+      document.getElementById('expectancy').textContent = data.expectancy || '--';
+      // List
+      const list = document.getElementById('historyList');
+      if (data.trades && data.trades.length) {
+        list.innerHTML = data.trades.map(t => `
+          <div class="history-item">
+            <div class="left">
+              <div class="symbol">${t.symbol} ${t.direction}</div>
+              <div class="meta">${t.entry} → ${t.exit}  ${t.time}</div>
+            </div>
+            <div class="right">
+              <div class="pnl" style="color:${t.pnl >= 0 ? '#32D74B' : '#FF3B30'}">${t.pnl >= 0 ? '+' : ''}${t.pnl}</div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        list.innerHTML = '<div style="text-align:center;color:#8E8E93;padding:20px;">No trades yet</div>';
+      }
+    }
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // ---- Tab Switching ----
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-page').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+      document.querySelector(`.tab-item[data-tab="${tabId}"]`).classList.add('active');
+      currentTab = tabId;
+      // Update header back button visibility
+      document.getElementById('headerBack').style.display = (tabId === 'quotes') ? 'none' : 'block';
+      // Update header title
+      if (tabId === 'chart') {
+        document.getElementById('headerTitle').textContent = `${currentSymbol} ${currentTimeframe}`;
+      } else {
+        document.getElementById('headerTitle').textContent = tabId.charAt(0).toUpperCase() + tabId.slice(1);
+      }
+      // Trigger chart resize if switching to chart
+      if (tabId === 'chart') {
+        setTimeout(renderChart, 100);
+      }
+    }
+
+    // ---- Chart Rendering ----
+    function renderChart() {
+      // This is a placeholder—real implementation uses Lightweight Charts.
+      // For now, we'll draw a simple canvas as a fallback.
+      const canvas = document.getElementById('chartCanvas');
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.scale(2,2);
+      ctx.fillStyle = '#0A0E17';
+      ctx.fillRect(0,0,rect.width,rect.height);
+      // Draw a simple grid and some candle-like bars
+      ctx.strokeStyle = '#2C2C2E';
+      ctx.lineWidth = 0.5;
+      for (let i=0; i<10; i++) {
+        let y = (rect.height/10)*i;
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(rect.width,y); ctx.stroke();
+      }
+      for (let i=0; i<20; i++) {
+        let x = (rect.width/20)*i;
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,rect.height); ctx.stroke();
+      }
+      // Draw random candlesticks (for demonstration)
+      const candleWidth = 8;
+      const gap = 4;
+      const startX = 20;
+      let price = rect.height * 0.6;
+      for (let i=0; i<40; i++) {
+        let open = price + (Math.random()-0.5)*20;
+        let close = price + (Math.random()-0.5)*20;
+        let high = Math.max(open,close) + Math.random()*10;
+        let low = Math.min(open,close) - Math.random()*10;
+        let x = startX + i*(candleWidth+gap);
+        let yHigh = (rect.height - (high - rect.height*0.1)) * 0.9;
+        let yLow = (rect.height - (low - rect.height*0.1)) * 0.9;
+        let yOpen = (rect.height - (open - rect.height*0.1)) * 0.9;
+        let yClose = (rect.height - (close - rect.height*0.1)) * 0.9;
+        ctx.strokeStyle = '#8E8E93';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(x+candleWidth/2, yHigh); ctx.lineTo(x+candleWidth/2, yLow); ctx.stroke();
+        ctx.fillStyle = close > open ? '#32D74B' : '#FF3B30';
+        ctx.fillRect(x, Math.min(yOpen,yClose), candleWidth, Math.abs(yOpen-yClose) || 1);
+        price = close;
+      }
+    }
+
+    // ---- Initialisation ----
+    document.addEventListener('DOMContentLoaded', function() {
+      // Tab clicks
+      document.querySelectorAll('.tab-item').forEach(el => {
+        el.addEventListener('click', () => switchTab(el.dataset.tab));
+      });
+      // Back button
+      document.getElementById('headerBack').addEventListener('click', () => switchTab('quotes'));
+      // Scanner toggle
+      document.getElementById('scannerToggle').addEventListener('click', function() {
+        scannerOpen = !scannerOpen;
+        document.getElementById('scannerBody').classList.toggle('open', scannerOpen);
+        this.querySelector('.arrow').classList.toggle('open', scannerOpen);
+      });
+      // Hamburger
+      document.getElementById('hamburgerToggle').addEventListener('click', function() {
+        document.getElementById('hamburgerOverlay').classList.add('open');
+        document.getElementById('hamburgerPanel').classList.add('open');
+      });
+      document.getElementById('hamburgerClose').addEventListener('click', closeHamburger);
+      document.getElementById('hamburgerOverlay').addEventListener('click', closeHamburger);
+      function closeHamburger() {
+        document.getElementById('hamburgerOverlay').classList.remove('open');
+        document.getElementById('hamburgerPanel').classList.remove('open');
+      }
+      // Voice toggle (placeholder)
+      document.getElementById('voiceToggle').addEventListener('click', function() {
+        this.classList.toggle('active');
+        showToast(this.classList.contains('active') ? 'Voice Assistant ON' : 'Voice Assistant OFF');
+      });
+      // Scan Chart button (dummy for now)
+      document.getElementById('scanChartBtn').addEventListener('click', function() {
+        showToast('Scan Chart triggered (backend integration pending)');
+      });
+      // Auto-trade toggle
+      document.getElementById('autoTradeToggle').addEventListener('change', function() {
+        showToast(this.checked ? 'Auto-Trade ENABLED' : 'Auto-Trade DISABLED');
+      });
+      // Telegram toggle
+      document.getElementById('telegramToggle').addEventListener('click', function() {
+        this.classList.toggle('active');
+        showToast(this.classList.contains('active') ? 'Telegram alerts ON' : 'Telegram alerts OFF');
+      });
+      // Timeframe buttons (generate dynamically)
+      const tfContainer = document.getElementById('timeframes');
+      ['M1','M5','M15','M30','H1','H4','D1','W1','MN'].forEach(tf => {
+        const btn = document.createElement('button');
+        btn.textContent = tf;
+        btn.dataset.tf = tf;
+        if (tf === currentTimeframe) btn.classList.add('active');
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.chart-timeframes button').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          currentTimeframe = this.dataset.tf;
+          document.getElementById('headerTitle').textContent = `${currentSymbol} ${currentTimeframe}`;
+          renderChart();
+        });
+        tfContainer.appendChild(btn);
+      });
+      // History sub-tabs
+      document.querySelectorAll('.history-tabs button').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.history-tabs button').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          showToast('Loading ' + this.textContent + '...');
+        });
+      });
+      // Search input
+      document.getElementById('searchInput').addEventListener('input', function() {
+        // client-side filtering - simple demo
+        const query = this.value.toLowerCase();
+        document.querySelectorAll('.quotes-row').forEach(row => {
+          const sym = row.dataset.symbol.toLowerCase();
+          row.style.display = sym.includes(query) ? 'flex' : 'none';
+        });
+      });
+      // Render initial chart
+      setTimeout(renderChart, 200);
+      // Connect WebSocket
+      connectWebSocket();
+      // Load initial mock quotes (will be replaced by real data)
+      loadMockQuotes();
+      // Update uptime
+      setInterval(() => {
+        const uptime = Math.floor((Date.now() - performance.timeOrigin) / 1000);
+        const hours = Math.floor(uptime / 3600);
+        const mins = Math.floor((uptime % 3600) / 60);
+        document.getElementById('uptime').textContent = `${hours}h ${mins}m`;
+      }, 1000);
+    });
+
+    // ---- Mock Quotes (for initial display) ----
+    function loadMockQuotes() {
+      const container = document.getElementById('quotesList');
+      const symbols = [
+        { symbol: 'BTCUSD', change: 2.34, bid: '68420.1', ask: '68420.5', time: '06:31:12', spread: 0.4, volume: '2.4B', confluence: 94, atlas: 'A', group: 'Crypto' },
+        { symbol: 'GOLD', change: -0.42, bid: '2045.2', ask: '2045.6', time: '06:31:10', spread: 0.8, volume: '--', confluence: 88, atlas: 'B', group: 'Forex' },
+        { symbol: 'EURUSD', change: 0.12, bid: '1.0845', ask: '1.0848', time: '06:31:09', spread: 0.2, volume: '--', confluence: 76, atlas: 'C', group: 'Forex' },
+        { symbol: 'GBPUSD', change: 0.55, bid: '1.2645', ask: '1.2649', time: '06:31:08', spread: 0.2, volume: '--', confluence: 64, atlas: 'D', group: 'Forex' },
+        { symbol: 'USDJPY', change: 0.16, bid: '158.25', ask: '158.29', time: '06:31:07', spread: 0.1, volume: '--', confluence: 72, atlas: 'B', group: 'Forex' },
+        { symbol: 'AAPL', change: -1.02, bid: '182.30', ask: '182.60', time: '06:30:55', spread: 0.3, volume: '58M', confluence: 58, atlas: 'C', group: 'Stocks' }
+      ];
+      let html = '';
+      symbols.forEach(s => {
+        const changeColor = s.change >= 0 ? '#32D74B' : '#FF3B30';
+        const confColor = s.confluence >= 85 ? '#00D4FF' : s.confluence >= 70 ? '#FFD60A' : s.confluence >= 50 ? '#FF9F0A' : '#FF3B30';
+        const atlasColor = {A:'#32D74B', B:'#007AFF', C:'#FF9F0A', D:'#FF3B30'}[s.atlas] || '#8E8E93';
+        html += `
+          <div class="quotes-row" data-symbol="${s.symbol}">
+            <div class="symbol">
+              <span class="name">${s.symbol}</span>
+              <span class="change" style="color:${changeColor}">${s.change >= 0 ? '+' : ''}${s.change.toFixed(2)}%</span>
+            </div>
+            <div class="time">${s.time}</div>
+            <div class="bidask">
+              <div>${s.bid}</div>
+              <div class="ask">${s.ask}</div>
+            </div>
+            <div class="spread">${s.spread.toFixed(1)}</div>
+            <div class="volume">${s.volume}</div>
+            <div class="edge">
+              <div class="score" style="color:${confColor}">${s.confluence}</div>
+              <div class="bar"><div class="fill" style="width:${s.confluence}%;background:${confColor};"></div></div>
+            </div>
+            <div class="atlas"><span style="background:${atlasColor};">${s.atlas}</span></div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+      // Groups
+      const groups = ['Forex (15/55)', 'Cryptocurrencies (2/60)', 'Stocks (2/1369)', 'Derivatives (7/65)'];
+      const gContainer = document.getElementById('groupsContainer');
+      groups.forEach(g => {
+        const div = document.createElement('div');
+        div.className = 'quotes-group';
+        div.innerHTML = `<span>${g}</span><span class="count">›</span>`;
+        gContainer.appendChild(div);
+      });
+    }
+
+    // ---- Resize chart on window resize ----
+    window.addEventListener('resize', () => {
+      if (currentTab === 'chart') renderChart();
+    });
+  </script>
+</body>
+</html>
