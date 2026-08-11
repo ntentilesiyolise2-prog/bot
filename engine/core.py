@@ -15,11 +15,8 @@ class TradingEngine:
     async def start(self):
         self.running = True
         logger.info("🚀 Trading Engine started.")
-        # Start the price broadcaster
         self.tasks.append(asyncio.create_task(self._broadcast_prices()))
-        # Start the scanner
         self.tasks.append(asyncio.create_task(self._run_scanner()))
-        # Start the risk monitor
         self.tasks.append(asyncio.create_task(self._monitor_risk()))
 
     async def _broadcast_prices(self):
@@ -27,10 +24,11 @@ class TradingEngine:
         while self.running:
             try:
                 for symbol in self.app.config['symbols']:
-                    # Fetch latest 1 candle
-                    df = await self.app.data_fabric.get_candles(symbol, "M1", limit=1)
-                    if not df.empty:
+                    df = await self.app.data_fabric.get_candles(symbol, "M1", limit=2)
+                    if not df.empty and len(df) > 1:
                         last = df.iloc[-1]
+                        prev = df.iloc[-2]
+                        change = round(((last['Close'] - prev['Close']) / prev['Close']) * 100, 2)
                         msg = {
                             "type": "price",
                             "symbol": symbol,
@@ -38,11 +36,10 @@ class TradingEngine:
                             "ask": round(last['Close'] * 1.0002, 2),
                             "high": last['High'],
                             "low": last['Low'],
-                            "change": round(((last['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close']) * 100, 2) if len(df) > 1 else 0,
+                            "change": change,
                             "volume": str(int(last['Volume'])) if last['Volume'] else "--",
                             "time": datetime.utcnow().strftime("%H:%M:%S"),
                             "spread": round((last['Close'] * 0.0004), 2),
-                            "confluence": 0  # Updated by scanner
                         }
                         await manager.broadcast(msg)
                 await asyncio.sleep(2)
@@ -59,7 +56,6 @@ class TradingEngine:
                     if df.empty:
                         continue
                     result = self.app.strategy_swarm.get_votes(df)
-                    # Format signal
                     signal = {
                         "type": "signal",
                         "symbol": symbol,
@@ -84,7 +80,15 @@ class TradingEngine:
                     "var": "$42.18",
                     "tilt": "NEUTRAL",
                     "gex": "+1.24M",
-                    "vpin": "0.34"
+                    "vpin": "0.34",
+                    "var_sub": "-3.27% equity",
+                    "tilt_sub": "Bias 0.12σ",
+                    "gex_sub": "Positive gamma",
+                    "vpin_sub": "Low toxicity",
+                    "var_pct": 68,
+                    "tilt_pct": 12,
+                    "gex_pct": 82,
+                    "vpin_pct": 34
                 }
                 await manager.broadcast(risk_data)
                 await asyncio.sleep(60)
