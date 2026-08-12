@@ -2,6 +2,9 @@ import aiohttp
 import os
 import pandas as pd
 from datetime import datetime, timedelta
+from utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 class FREDProvider:
     def __init__(self):
@@ -9,21 +12,24 @@ class FREDProvider:
         self.base_url = "https://api.stlouisfed.org/fred/series/observations"
 
     async def get_cpi(self):
-        """Fetch latest CPI data."""
         if not self.api_key:
             return None
         params = {
             "series_id": "CPIAUCSL",
             "api_key": self.api_key,
-            "file_type": "json"
+            "file_type": "json",
+            "limit": 2
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.base_url, params=params) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    observations = data['observations']
-                    return {
-                        "latest": float(observations[-1]['value']),
-                        "change": float(observations[-1]['value']) - float(observations[-2]['value'])
-                    }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.base_url, params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        obs = data['observations']
+                        if len(obs) >= 2:
+                            latest = float(obs[-1]['value'])
+                            prev = float(obs[-2]['value'])
+                            return {"latest": latest, "change": latest - prev}
+        except Exception as e:
+            logger.error(f"FRED error: {e}")
         return None
