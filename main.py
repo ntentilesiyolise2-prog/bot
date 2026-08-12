@@ -11,7 +11,7 @@ from datetime import datetime
 
 from data.fabric import DataFabric
 from features.store import FeatureStore
-from strategies.adaptive_swarm import AdaptiveSwarm
+from strategies.hierarchical_swarm import HierarchicalSwarm
 from risk.engine import RiskEngine
 from risk.circuit_breaker import CircuitBreaker
 from risk.recovery_mode import RecoveryMode
@@ -24,7 +24,7 @@ from api.comparison import router as comparison_router
 from api.brain_visualisation import router as brain_router
 from api.correlation import router as correlation_router
 from api.import_export import router as import_export_router
-from api.status import router as status_router          # <-- NEW
+from api.status import router as status_router
 from engine.core import TradingEngine
 from engine.scheduler import schedule_nightly
 from utils.telegram import TelegramBot
@@ -53,7 +53,7 @@ with open('config.json', 'r') as f:
 app.state.config = config
 app.state.data_fabric = DataFabric()
 app.state.feature_store = FeatureStore(app.state.data_fabric)
-app.state.strategy_swarm = AdaptiveSwarm()
+app.state.strategy_swarm = HierarchicalSwarm()
 app.state.risk_engine = RiskEngine(config)
 app.state.circuit_breaker = CircuitBreaker(
     max_daily_loss=config['risk']['max_daily_loss'],
@@ -64,7 +64,6 @@ app.state.execution_core = ExecutionCore(config)
 app.state.telegram = TelegramBot()
 app.state.engine = TradingEngine(app.state)
 app.state.daily_briefing = DailyBriefing(app.state)
-# NEW: startup timestamp for uptime tracking
 app.state.start_time = datetime.utcnow()
 
 # --- API Routers ---
@@ -75,7 +74,7 @@ app.include_router(comparison_router)
 app.include_router(brain_router)
 app.include_router(correlation_router)
 app.include_router(import_export_router)
-app.include_router(status_router)          # <-- NEW
+app.include_router(status_router)
 app.add_api_websocket_route("/ws", websocket_handler)
 
 # --- Serve Frontend ---
@@ -83,14 +82,13 @@ frontend_path = Path(__file__).parent / "frontend"
 if frontend_path.exists():
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
-# --- Lifecycle Events ---
+# --- Lifecycle ---
 @app.on_event("startup")
 async def startup():
     logger.info("🚀 Starting NEXUS INFINITUM v3.0...")
     await app.state.data_fabric.initialize()
     await app.state.execution_core.initialize()
     await app.state.engine.start()
-    # Schedule nightly tasks
     schedule_nightly(app.state)
     logger.info("✅ All systems ready. Engine is running.")
 
