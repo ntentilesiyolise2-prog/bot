@@ -10,7 +10,7 @@ logger = setup_logger(__name__)
 
 class NexusScanner:
     def __init__(self):
-        self.vision_scanner = GeminiVisionScanner()  # <-- Now using Gemini
+        self.vision_scanner = GeminiVisionScanner()  # Uses Gemini for chart analysis
         self.lstm = PricePredictor()
         self.feature_store = None
         self.strategy_swarm = None
@@ -47,6 +47,7 @@ class NexusScanner:
         return result
 
     def _generate_overlays(self, features):
+        # Placeholder for future ICT overlays
         return {
             'order_blocks': [],
             'fvg': [],
@@ -55,22 +56,36 @@ class NexusScanner:
         }
 
     async def scan_image(self, image_bytes, symbol, timeframe):
-        """Scan a chart image using Gemini Vision."""
+        """Scan a chart image using Gemini Vision and return a detailed signal."""
         result = await self.vision_scanner.scan(image_bytes)
         if result and 'error' not in result:
             return {
                 'symbol': symbol,
-                'direction': result.get('direction', 'neutral'),
+                'direction': result.get('direction', 'NEUTRAL'),
                 'confluence': result.get('confidence', 50),
-                'explanation': result.get('raw', 'No explanation'),
+                'explanation': result.get('explanation', 'No explanation'),
+                'setup_grade': result.get('setup_grade', 'B'),
+                'risk_reward': result.get('risk_reward', 'N/A'),
+                'entry': result.get('entry'),
+                'take_profit': result.get('take_profit'),
+                'stop_loss': result.get('stop_loss'),
+                'invalidation': result.get('invalidation'),
+                'patterns': result.get('patterns', []),
                 'overlays': {}
             }
-        # If Gemini fails, return a basic rule-based fallback
-        logger.warning("Gemini vision failed, falling back to rule-based scanner.")
+        # Fallback to rule‑based (no AI vision)
+        logger.warning("Gemini vision failed, falling back to rule‑based scanner.")
         return {
             'symbol': symbol,
-            'direction': 'neutral',
+            'direction': 'NEUTRAL',
             'confluence': 50,
-            'explanation': 'Rule-based fallback (no AI vision)',
+            'explanation': 'Rule‑based fallback (no AI vision)',
+            'setup_grade': 'C',
+            'risk_reward': 'N/A',
+            'entry': None,
+            'take_profit': None,
+            'stop_loss': None,
+            'invalidation': None,
+            'patterns': [],
             'overlays': {}
         }
