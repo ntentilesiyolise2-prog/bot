@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import datetime
 
 from data.fabric import DataFabric
 from features.store import FeatureStore
@@ -23,6 +24,7 @@ from api.comparison import router as comparison_router
 from api.brain_visualisation import router as brain_router
 from api.correlation import router as correlation_router
 from api.import_export import router as import_export_router
+from api.status import router as status_router          # <-- NEW
 from engine.core import TradingEngine
 from engine.scheduler import schedule_nightly
 from utils.telegram import TelegramBot
@@ -62,6 +64,8 @@ app.state.execution_core = ExecutionCore(config)
 app.state.telegram = TelegramBot()
 app.state.engine = TradingEngine(app.state)
 app.state.daily_briefing = DailyBriefing(app.state)
+# NEW: startup timestamp for uptime tracking
+app.state.start_time = datetime.utcnow()
 
 # --- API Routers ---
 app.include_router(api_router)
@@ -71,6 +75,7 @@ app.include_router(comparison_router)
 app.include_router(brain_router)
 app.include_router(correlation_router)
 app.include_router(import_export_router)
+app.include_router(status_router)          # <-- NEW
 app.add_api_websocket_route("/ws", websocket_handler)
 
 # --- Serve Frontend ---
