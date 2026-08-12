@@ -73,9 +73,9 @@ class TradingEngine:
                         "symbol": symbol,
                         "confluence": result['confluence'],
                         "direction": result['direction'],
-                        "signals": [{"symbol": symbol, "direction": result['direction'], "setup": "Multi-Agent", "confluence": result['confluence']}],
+                        "signals": [{"symbol": symbol, "direction": result['direction'], "setup": "Multi-Horizon", "confluence": result['confluence']}],
                         "breakdown": result['breakdown'],
-                        "explanation": f"Multi-agent vote: {result['votes']}. Confluence: {result['confluence']}%."
+                        "explanation": f"Swarm vote: {result['votes']}. Confluence: {result['confluence']}%."
                     }
                     self.last_signals[symbol] = signal
                     await manager.broadcast(signal)
@@ -139,7 +139,7 @@ class TradingEngine:
                         result = await self.app.execution_core.execute_order(trade)
                         if result.get('status') == 'executed':
                             pnl = result.get('pnl', 0.5)
-                            self.app.strategy_swarm.update_performance('Multi-Agent', pnl)
+                            self.app.strategy_swarm.update_performance('day', pnl)  # default layer
                             await self.app.telegram.send_message(
                                 f"🤖 Auto-Trade: {direction} {symbol} 0.01 lots @ {result.get('price', 'market')}"
                             )
