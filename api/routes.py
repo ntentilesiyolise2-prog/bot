@@ -15,9 +15,10 @@ class TradeRequest(BaseModel):
 class QueryRequest(BaseModel):
     question: str
 
-# --- Core Routes ---
+# ==================== CORE ENDPOINTS ====================
 @router.get("/api/quotes")
 async def get_quotes():
+    """Placeholder for quote list – real data comes via WebSocket."""
     return {"symbols": []}
 
 @router.get("/api/candles")
@@ -74,7 +75,7 @@ async def get_positions():
     broker = app.state.execution_core.broker
     return {"positions": getattr(broker, 'positions', [])}
 
-# --- Symbol Management ---
+# ==================== SYMBOL MANAGEMENT ====================
 from data.symbol_info import SymbolInfo
 
 @router.get("/api/symbols/search")
@@ -107,19 +108,18 @@ async def remove_symbol(symbol: str):
         return {"status": "removed", "symbol": symbol}
     return {"status": "failed", "symbol": symbol}
 
-# --- Vision (Gemini) ---
+# ==================== VISION (GEMINI) ====================
 @router.post("/api/analyze_chart")
 async def analyze_chart(file: UploadFile = File(...)):
     app = router.app
     try:
         image_bytes = await file.read()
-        # Use the scanner (which now uses Gemini)
         result = await app.state.scanner.scan_image(image_bytes, "BTCUSD", "M15")
         return {"patterns": result}
     except Exception as e:
         return {"error": str(e)}
 
-# --- Assistant (RAG + Groq) ---
+# ==================== ASSISTANT (RAG + Groq) ====================
 @router.post("/api/assistant/query")
 async def assistant_query(query: QueryRequest):
     app = router.app
@@ -132,7 +132,7 @@ async def assistant_query(query: QueryRequest):
     except Exception as e:
         return {"answer": f"Error: {str(e)}"}
 
-# --- Learning Mode ---
+# ==================== LEARNING MODE ====================
 from ai.learning.lesson_db import LESSONS, LessonManager
 
 @router.get("/api/learning/lessons")
@@ -153,7 +153,7 @@ async def mark_complete(user_id: str, lesson_id: int):
     progress = manager.mark_complete(user_id, lesson_id)
     return progress
 
-# --- Comparison (Bot vs Human) ---
+# ==================== COMPARISON (Bot vs Human) ====================
 @router.get("/api/comparison")
 async def get_comparison():
     from utils.journal import TradeJournal
@@ -184,7 +184,7 @@ async def get_comparison():
         "difference": round(bot["total_pnl"] - human["total_pnl"], 2)
     }
 
-# --- Recovery Mode ---
+# ==================== RECOVERY MODE ====================
 @router.get("/api/recovery/status")
 async def get_recovery_status():
     app = router.app
@@ -198,14 +198,14 @@ async def reset_recovery():
     app.state.circuit_breaker.tripped = False
     return {"status": "recovery_reset"}
 
-# --- Daily Briefing ---
+# ==================== DAILY BRIEFING ====================
 @router.post("/api/briefing/send")
 async def send_briefing():
     app = router.app
     await app.state.daily_briefing.generate()
     return {"status": "briefing_sent"}
 
-# --- Correlation Matrix ---
+# ==================== CORRELATION MATRIX ====================
 @router.get("/api/correlation")
 async def get_correlation():
     app = router.app
@@ -220,10 +220,75 @@ async def get_correlation():
     corr = df.corr().round(2)
     return corr.to_dict()
 
-# --- Brain Visualisation (Feature Importance) ---
+# ==================== BRAIN VISUALISATION ====================
 @router.get("/api/brain/feature_importance")
 async def get_feature_importance():
     from ai.models.xgboost_model import XGBoostModel
     model = XGBoostModel()
     importance = model.get_feature_importance()
     return {"features": importance}
+
+# ==================== SYSTEM STATUS ====================
+@router.get("/api/status")
+async def get_system_status():
+    app = router.app
+    from utils.journal import TradeJournal
+    import psutil
+    journal = TradeJournal()
+    trades = journal.get_trades(days=365)
+    total_trades = len(trades)
+    win_trades = [t for t in trades if t.get('pnl', 0) > 0]
+    win_rate = (len(win_trades) / total_trades * 100) if total_trades > 0 else 0
+    active_positions = len(app.state.execution_core.broker.positions) if hasattr(app.state.execution_core.broker, 'positions') else 0
+    drawdown = app.state.risk_engine.max_drawdown if hasattr(app.state.risk_engine, 'max_drawdown') else 0
+    uptime_seconds = (datetime.utcnow() - app.state.start_time).total_seconds() if hasattr(app.state, 'start_time') else 0
+    hours = int(uptime_seconds // 3600)
+    minutes = int((uptime_seconds % 3600) // 60)
+    broker_status = "Connected" if app.state.execution_core.broker.connected else "Disconnected"
+    engine_status = "Running" if app.state.engine.running else "Stopped"
+    last_signal = "No signals yet"
+    if hasattr(app.state.scanner, 'last_results'):
+        for sym, res in app.state.scanner.last_results.items():
+            if res:
+                last_signal = f"{sym}: {res.get('direction', 'N/A')} ({res.get('confluence', 0)}%)"
+                break
+    cpu = psutil.cpu_percent(interval=0.1)
+    mem = psutil.virtual_memory()
+    return {
+        "uptime": f"{hours}h {minutes}m",
+        "total_trades": total_trades,
+        "win_rate": round(win_rate, 1),
+        "drawdown": round(drawdown, 2),
+        "active_positions": active_positions,
+        "last_signal": last_signal,
+        "broker_status": broker_status,
+        "engine_status": engine_status,
+        "cpu_usage": round(cpu, 1),
+        "memory_used": round(mem.used / (1024**3), 2),
+        "memory_total": round(mem.total / (1024**3), 2)
+    }
+
+# ==================== SOS PANIC BUTTON ====================
+import asyncio
+from datetime import datetime
+
+@router.post("/api/sos")
+async def sos_panic():
+    app = router.app
+    # Flatten all positions
+    await app.state.execution_core.flatten_all()
+    # Cancel pending orders
+    app.state.execution_core.pending_orders.clear()
+    # Pause auto‑trade for 1 hour
+    app.state.engine.auto_trade_enabled = False
+    # Notify via Telegram
+    await app.state.telegram.send_message("🚨 SOS PANIC ACTIVATED. All positions flattened. Engine paused for 1 hour.")
+    # Schedule auto‑restart
+    asyncio.create_task(_auto_restart_engine(app.state))
+    return {"status": "panic_activated", "engine_paused": True}
+
+async def _auto_restart_engine(app_state):
+    await asyncio.sleep(3600)  # 1 hour
+    app_state.engine.auto_trade_enabled = True
+    await app_state.telegram.send_message("✅ Engine auto‑restarted after SOS panic.")
+    logger.info("Engine auto‑restarted after panic.")
