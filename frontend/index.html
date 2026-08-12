@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  
+
   <!-- Lightweight Charts CDN -->
   <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 
@@ -110,7 +110,7 @@
     .chart-oracle { position:absolute; bottom:12px; right:12px; left:12px; background:rgba(10,14,23,0.9); backdrop-filter:blur(10px); border:1px solid #2C2C2E; border-radius:12px; padding:10px 14px; font-size:12px; color:#8E8E93; pointer-events:auto; max-width:80%; margin-left:auto; }
     .chart-oracle .label { font-weight:600; color:#AF52DE; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; }
     .chart-oracle .text { color:white; margin-top:2px; }
-    /* ---- LEARNING MODE PANEL (Extras) ---- */
+    /* ---- LEARNING MODE PANEL ---- */
     #learningPanel { margin-top: 8px; border-top: 1px solid #2C2C2E; padding-top: 8px; display:none; }
     #learningPanel .header { font-size:13px; font-weight:600; color:#AF52DE; display:flex; justify-content:space-between; }
     #learningPanel .lesson-box { background:#1C1C1E; border-radius:8px; padding:10px; margin-top:4px; }
@@ -119,7 +119,7 @@
     #learningPanel .actions { display:flex; gap:8px; margin-top:8px; }
     #learningPanel .actions button { flex:1; background:#007AFF; border:none; color:white; padding:6px; border-radius:6px; font-size:12px; cursor:pointer; }
     #learningPanel .actions button.secondary { background:#2C2C2E; }
-    /* ---- Comparison Panel ---- */
+    /* ---- COMPARISON PANEL ---- */
     #comparisonPanel { margin-top: 8px; border-top: 1px solid #2C2C2E; padding-top: 8px; display:none; }
     #comparisonPanel .header { font-size:13px; font-weight:600; color:#AF52DE; }
     #comparisonStats { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
@@ -267,7 +267,7 @@
                 <label><input type="checkbox" id="autoTradeToggle"> Auto‑Trade</label>
                 <span style="font-size:10px;color:#8E8E93;margin-left:auto;">Min confl.: 75%</span>
               </div>
-              <!-- Learning Mode Panel (Extras) -->
+              <!-- Learning Mode Panel -->
               <div id="learningPanel">
                 <div class="header">
                   <span>📘 Trading Academy</span>
@@ -442,9 +442,25 @@
       </div>
       <div class="group">
         <div class="group-title">System</div>
-        <div class="item" id="menuRecovery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span class="text">Recovery Mode</span><span class="status on" id="recoveryStatus">Active</span></div>
-        <div class="item" id="menuBriefing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="text">Daily Briefing</span></div>
-        <div class="item" id="menuDiagnostics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg><span class="text">System Diagnostics</span></div>
+        <!-- NEW: System Status item -->
+        <div class="item" id="menuStatus">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.5 12"/></svg>
+          <span class="text">System Status</span>
+          <span class="status on" id="statusIndicator">Live</span>
+        </div>
+        <div class="item" id="menuRecovery">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          <span class="text">Recovery Mode</span>
+          <span class="status on" id="recoveryStatus">Active</span>
+        </div>
+        <div class="item" id="menuBriefing">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="8" y1="16" x2="16" y2="8"/></svg>
+          <span class="text">Daily Briefing</span>
+        </div>
+        <div class="item" id="menuDiagnostics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+          <span class="text">System Diagnostics</span>
+        </div>
       </div>
       <div class="item" style="border-bottom:none;" id="menuShare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="text">Share App</span></div>
     </div>
@@ -993,19 +1009,34 @@
           try {
             const res = await fetch('/api/analyze_chart', { method: 'POST', body: formData });
             const result = await res.json();
-            showToast('Scan complete: ' + (result.patterns ? result.patterns.length + ' patterns found' : 'No patterns'));
-            if (result.patterns) {
+            if (result.patterns && result.patterns.error) {
+              showToast('Scan error: ' + result.patterns.error);
+            } else {
+              const patterns = result.patterns || {};
+              const dir = patterns.direction || 'NEUTRAL';
+              const conf = patterns.confluence || 50;
+              const grade = patterns.setup_grade || 'B';
+              const rr = patterns.risk_reward || 'N/A';
+              const entry = patterns.entry || '--';
+              const tp = patterns.take_profit || '--';
+              const sl = patterns.stop_loss || '--';
+              const invalidation = patterns.invalidation || '--';
+              const explanation = patterns.explanation || 'No explanation';
+              showToast(`📊 ${dir} | ${conf}% | Grade ${grade} | RR ${rr}`);
+              // Update top signals with detailed card
               const container = topSignals;
-              container.innerHTML = result.patterns.slice(0,3).map((p, i) => `
-                <div class="chart-signal-card">
+              container.innerHTML = `
+                <div class="chart-signal-card" style="grid-column: span 3;">
                   <div class="top">
-                    <span class="sym">${p.class || 'Pattern'}</span>
-                    <span class="dir long">${p.confidence || 0}%</span>
+                    <span class="sym">${currentSymbol}</span>
+                    <span class="dir ${dir === 'BUY' ? 'long' : 'short'}">${dir}</span>
                   </div>
-                  <div class="setup">${p.class || 'Detected'}</div>
-                  <div class="conf">${p.confidence || 0}% confidence</div>
+                  <div class="setup">Confidence: ${conf}% | Grade: ${grade} | RR: ${rr}</div>
+                  <div class="conf">Entry: ${entry} | TP: ${tp} | SL: ${sl}</div>
+                  <div style="font-size:10px; color:#8E8E93; margin-top:4px;">${explanation}</div>
+                  <div style="font-size:10px; color:#FF9F0A; margin-top:2px;">Invalidation: ${invalidation}</div>
                 </div>
-              `).join('');
+              `;
             }
           } catch (err) {
             showToast('Scan failed: ' + err.message);
@@ -1109,6 +1140,26 @@
       document.getElementById('menuImportExport').addEventListener('click', function() {
         showToast('📤 Import/Export Settings: Feature ready');
         closeHamburger();
+      });
+      // NEW: System Status
+      document.getElementById('menuStatus').addEventListener('click', function() {
+        fetch('/api/status')
+          .then(res => res.json())
+          .then(data => {
+            const msg = `📊 System Status\n` +
+                        `Uptime: ${data.uptime}\n` +
+                        `Trades: ${data.total_trades}\n` +
+                        `Win Rate: ${data.win_rate}%\n` +
+                        `Drawdown: ${data.drawdown}%\n` +
+                        `Positions: ${data.active_positions}\n` +
+                        `Last Signal: ${data.last_signal}\n` +
+                        `Broker: ${data.broker_status}\n` +
+                        `Engine: ${data.engine_status}\n` +
+                        `CPU: ${data.cpu_usage}% | RAM: ${data.memory_used}GB / ${data.memory_total}GB`;
+            showToast(msg);
+            closeHamburger();
+          })
+          .catch(() => showToast('Failed to fetch status'));
       });
       document.getElementById('menuRecovery').addEventListener('click', function() {
         showToast('🔄 Recovery Mode: Checking status...');
