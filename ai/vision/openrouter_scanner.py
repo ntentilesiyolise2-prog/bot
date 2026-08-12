@@ -10,23 +10,22 @@ class OpenRouterVisionScanner:
         self.api_key = os.getenv("OPENROUTER_API_KEY", "")
         self.enabled = bool(self.api_key)
 
-    async def scan(self, image_bytes: bytes) -> dict:
+    async def scan(self, image_bytes):
         if not self.enabled:
-            return {"error": "OpenRouter API key missing. Please set OPENROUTER_API_KEY in .env"}
+            return {"error": "OpenRouter API key missing. Set OPENROUTER_API_KEY in .env"}
 
-        # Encode image to base64
         b64 = base64.b64encode(image_bytes).decode('utf-8')
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "gpt-4-vision-preview",  # or "claude-3-opus-20240229-vision"
+            "model": "gpt-4-vision-preview",
             "messages": [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Analyze this candlestick chart. Identify patterns (e.g., engulfing, doji, head and shoulders). Estimate the likely direction (bullish, bearish, neutral). Give a confidence score (0-100) and a brief explanation."},
+                        {"type": "text", "text": "Analyze this candlestick chart. Identify patterns (engulfing, doji, head and shoulders, etc.). Give direction (bullish/bearish/neutral) and confidence (0-100)."},
                         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}
                     ]
                 }
@@ -40,14 +39,12 @@ class OpenRouterVisionScanner:
                     if resp.status == 200:
                         data = await resp.json()
                         content = data['choices'][0]['message']['content']
-                        # Simple parsing
                         direction = "neutral"
                         confidence = 50
                         if "bullish" in content.lower():
                             direction = "bullish"
                         elif "bearish" in content.lower():
                             direction = "bearish"
-                        # Extract confidence if present
                         import re
                         match = re.search(r'(\d+)%', content)
                         if match:
