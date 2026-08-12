@@ -110,7 +110,7 @@
     .chart-oracle { position:absolute; bottom:12px; right:12px; left:12px; background:rgba(10,14,23,0.9); backdrop-filter:blur(10px); border:1px solid #2C2C2E; border-radius:12px; padding:10px 14px; font-size:12px; color:#8E8E93; pointer-events:auto; max-width:80%; margin-left:auto; }
     .chart-oracle .label { font-weight:600; color:#AF52DE; font-size:10px; text-transform:uppercase; letter-spacing:0.5px; }
     .chart-oracle .text { color:white; margin-top:2px; }
-    /* ---- LEARNING MODE PANEL ---- */
+    /* ---- LEARNING MODE PANEL (Extras) ---- */
     #learningPanel { margin-top: 8px; border-top: 1px solid #2C2C2E; padding-top: 8px; display:none; }
     #learningPanel .header { font-size:13px; font-weight:600; color:#AF52DE; display:flex; justify-content:space-between; }
     #learningPanel .lesson-box { background:#1C1C1E; border-radius:8px; padding:10px; margin-top:4px; }
@@ -119,6 +119,13 @@
     #learningPanel .actions { display:flex; gap:8px; margin-top:8px; }
     #learningPanel .actions button { flex:1; background:#007AFF; border:none; color:white; padding:6px; border-radius:6px; font-size:12px; cursor:pointer; }
     #learningPanel .actions button.secondary { background:#2C2C2E; }
+    /* ---- Comparison Panel ---- */
+    #comparisonPanel { margin-top: 8px; border-top: 1px solid #2C2C2E; padding-top: 8px; display:none; }
+    #comparisonPanel .header { font-size:13px; font-weight:600; color:#AF52DE; }
+    #comparisonStats { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
+    #comparisonStats .stat { background:#1C1C1E; border-radius:8px; padding:8px; }
+    #comparisonStats .stat .label { font-size:10px; color:#8E8E93; }
+    #comparisonStats .stat .value { font-size:16px; font-weight:700; }
     /* ---- TRADE TAB ---- */
     .trade-account { background:#1C1C1E; padding:12px; border-bottom:1px solid #2C2C2E; }
     .trade-account .top { display:flex; justify-content:space-between; align-items:baseline; }
@@ -260,7 +267,7 @@
                 <label><input type="checkbox" id="autoTradeToggle"> Auto‑Trade</label>
                 <span style="font-size:10px;color:#8E8E93;margin-left:auto;">Min confl.: 75%</span>
               </div>
-              <!-- Learning Mode Panel -->
+              <!-- Learning Mode Panel (Extras) -->
               <div id="learningPanel">
                 <div class="header">
                   <span>📘 Trading Academy</span>
@@ -273,6 +280,17 @@
                 <div class="actions">
                   <button id="nextLessonBtn">Next Lesson</button>
                   <button class="secondary" id="practiceModeBtn">Practice Mode</button>
+                  <button class="secondary" id="comparisonToggleBtn">Compare with Bot</button>
+                </div>
+              </div>
+              <!-- Comparison Panel -->
+              <div id="comparisonPanel">
+                <div class="header">Bot vs. Human Comparison</div>
+                <div id="comparisonStats">
+                  <div class="stat"><div class="label">Human Win Rate</div><div class="value" id="humanWinRate">--</div></div>
+                  <div class="stat"><div class="label">Bot Win Rate</div><div class="value" id="botWinRate">--</div></div>
+                  <div class="stat"><div class="label">Human PnL</div><div class="value" id="humanPnl">--</div></div>
+                  <div class="stat"><div class="label">Bot PnL</div><div class="value" id="botPnl">--</div></div>
                 </div>
               </div>
             </div>
@@ -370,7 +388,7 @@
         </div>
         <div class="settings-section">
           <div class="title">System</div>
-          <div class="settings-item"><span class="label">Version</span><span class="value">v2.0.0</span></div>
+          <div class="settings-item"><span class="label">Version</span><span class="value">v3.0.0</span></div>
           <div class="settings-item"><span class="label">Uptime</span><span class="value" id="uptime">--</span></div>
         </div>
       </div>
@@ -409,27 +427,26 @@
     <div class="hamburger-panel" id="hamburgerPanel">
       <div class="close" id="hamburgerClose">✕</div>
       <div class="title">NEXUS INFINITUM</div>
-      <div class="version">v2.0.0</div>
+      <div class="version">v3.0.0</div>
       <div class="group">
         <div class="group-title">Analytics</div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg><span class="text">AI Decision Visualiser</span></div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10z"/><path d="M12 6v6l4 2"/></svg><span class="text">Sentiment Heatmap</span></div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span class="text">Correlation Matrix</span></div>
+        <div class="item" id="menuBrain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg><span class="text">The Brain</span></div>
+        <div class="item" id="menuSentiment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10z"/><path d="M12 6v6l4 2"/></svg><span class="text">Sentiment Heatmap</span></div>
+        <div class="item" id="menuCorrelation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span class="text">Correlation Matrix</span></div>
       </div>
       <div class="group">
         <div class="group-title">Tools</div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg><span class="text">What If Simulator</span></div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><span class="text">Bot vs. Human Comparison</span></div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="text">Import / Export Settings</span></div>
+        <div class="item" id="menuSimulator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg><span class="text">What If Simulator</span></div>
+        <div class="item" id="menuComparison"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><span class="text">Bot vs. Human</span></div>
+        <div class="item" id="menuImportExport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="text">Import / Export Settings</span></div>
       </div>
       <div class="group">
         <div class="group-title">System</div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span class="text">Recovery Mode Status</span><span class="status on">Active</span></div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="text">Daily Briefing Archive</span></div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg><span class="text">Voice Assistant</span><span class="status on">ON</span></div>
-        <div class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg><span class="text">System Diagnostics</span></div>
+        <div class="item" id="menuRecovery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg><span class="text">Recovery Mode</span><span class="status on" id="recoveryStatus">Active</span></div>
+        <div class="item" id="menuBriefing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><line x1="8" y1="8" x2="16" y2="16"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="text">Daily Briefing</span></div>
+        <div class="item" id="menuDiagnostics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg><span class="text">System Diagnostics</span></div>
       </div>
-      <div class="item" style="border-bottom:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="text">Share App (Add to Home Screen)</span></div>
+      <div class="item" style="border-bottom:none;" id="menuShare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="text">Share App</span></div>
     </div>
   </div>
 
@@ -495,6 +512,12 @@
     const lessonContent = document.getElementById('lessonContent');
     const nextLessonBtn = document.getElementById('nextLessonBtn');
     const practiceModeBtn = document.getElementById('practiceModeBtn');
+    const comparisonToggleBtn = document.getElementById('comparisonToggleBtn');
+    const comparisonPanel = document.getElementById('comparisonPanel');
+    const humanWinRate = document.getElementById('humanWinRate');
+    const botWinRate = document.getElementById('botWinRate');
+    const humanPnl = document.getElementById('humanPnl');
+    const botPnl = document.getElementById('botPnl');
 
     // ---- WEBSOCKET ----
     function connectWebSocket() {
@@ -506,7 +529,6 @@
         console.log('WebSocket connected');
         connStatus.className = 'connection-status';
         reconnectAttempts = 0;
-        // Subscribe to all active symbols from config
         fetchActiveSymbols().then(symbols => {
           if (symbols && symbols.length) {
             ws.send(JSON.stringify({ action: 'subscribe', symbols }));
@@ -874,6 +896,20 @@
       }
     }
 
+    // ---- EXTRAS: LOAD COMPARISON ----
+    async function loadComparison() {
+      try {
+        const res = await fetch('/api/comparison');
+        const data = await res.json();
+        humanWinRate.textContent = data.human_win_rate || 0;
+        botWinRate.textContent = data.bot_win_rate || 0;
+        humanPnl.textContent = data.human_total_pnl || 0;
+        botPnl.textContent = data.bot_total_pnl || 0;
+      } catch (e) {
+        console.warn('Comparison load error', e);
+      }
+    }
+
     // ---- INITIALISATION ----
     document.addEventListener('DOMContentLoaded', function() {
       // Tab clicks
@@ -1024,7 +1060,7 @@
             { title: 'Order Blocks', content: 'Institutional limit order zones where large players place their orders.' },
             { title: 'Liquidity Sweeps', content: 'Price moves to take out stops (liquidity) before reversing.' }
           ],
-          advanced: [
+          intermediate: [
             { title: 'Causal Inference', content: 'Understanding the root cause of price movements (e.g., oil -> USDJPY).' },
             { title: 'Digital Twin Simulation', content: 'Testing trades in a simulated market before execution.' }
           ]
@@ -1037,6 +1073,63 @@
       });
       practiceModeBtn.addEventListener('click', function() {
         showToast('Practice Mode: Simulated account activated. (Backend integration pending)');
+      });
+      // Comparison toggle
+      comparisonToggleBtn.addEventListener('click', function() {
+        const isVisible = comparisonPanel.style.display !== 'none';
+        comparisonPanel.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+          loadComparison();
+        }
+        showToast(isVisible ? 'Comparison hidden' : 'Comparison shown');
+      });
+      // Hamburger menu items
+      document.getElementById('menuBrain').addEventListener('click', function() {
+        showToast('🧠 The Brain: Feature importance visualisation coming soon');
+        closeHamburger();
+      });
+      document.getElementById('menuSentiment').addEventListener('click', function() {
+        showToast('📊 Sentiment Heatmap: Loading...');
+        closeHamburger();
+      });
+      document.getElementById('menuCorrelation').addEventListener('click', function() {
+        showToast('🔗 Correlation Matrix: Loading...');
+        closeHamburger();
+      });
+      document.getElementById('menuSimulator').addEventListener('click', function() {
+        showToast('🧪 What If Simulator: Opening...');
+        closeHamburger();
+      });
+      document.getElementById('menuComparison').addEventListener('click', function() {
+        comparisonPanel.style.display = 'block';
+        loadComparison();
+        showToast('📈 Bot vs. Human Comparison loaded');
+        closeHamburger();
+      });
+      document.getElementById('menuImportExport').addEventListener('click', function() {
+        showToast('📤 Import/Export Settings: Feature ready');
+        closeHamburger();
+      });
+      document.getElementById('menuRecovery').addEventListener('click', function() {
+        showToast('🔄 Recovery Mode: Checking status...');
+        closeHamburger();
+      });
+      document.getElementById('menuBriefing').addEventListener('click', function() {
+        showToast('📰 Daily Briefing: Sending...');
+        fetch('/api/briefing/send', { method: 'POST' });
+        closeHamburger();
+      });
+      document.getElementById('menuDiagnostics').addEventListener('click', function() {
+        showToast('⚙️ System Diagnostics: Checking...');
+        closeHamburger();
+      });
+      document.getElementById('menuShare').addEventListener('click', function() {
+        if (navigator.share) {
+          navigator.share({ title: 'NEXUS INFINITUM', url: window.location.href });
+        } else {
+          showToast('Share not supported on this browser');
+        }
+        closeHamburger();
       });
       // Uptime
       setInterval(() => {
