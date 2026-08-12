@@ -1,7 +1,13 @@
 {
-  "symbols": [],
-  "load_all_symbols": true,
-  "timeframes": ["M1", "M5", "M15", "M30", "H1", "H4", "D1"],
+  "symbols": ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "USDJPY", "GOLD", "AAPL", "SPX"],
+  "crypto_symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+  "forex_pairs": ["EURUSD", "GBPUSD", "USDJPY"],
+  "timeframes": {
+    "scalp": ["M1"],
+    "day": ["M15", "M30"],
+    "swing": ["H4"],
+    "position": ["D1"]
+  },
   "risk": {
     "max_daily_loss": 50.0,
     "max_drawdown_pct": 5.0,
@@ -20,8 +26,9 @@
     }
   },
   "ai": {
-    "scanner_interval_sec": 5,
+    "scanner_interval_sec": 10,
     "min_confluence_threshold": 75,
-    "auto_trade": true
+    "auto_trade": true,
+    "scalping_enabled": true
   }
 }
