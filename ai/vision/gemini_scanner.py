@@ -1,6 +1,10 @@
 import os
 import base64
+import json
+import re
 import google.generativeai as genai
+import PIL.Image
+import io
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -17,57 +21,75 @@ class GeminiVisionScanner:
             logger.warning("GEMINI_API_KEY not set. Vision scanner disabled.")
 
     async def scan(self, image_bytes):
-        """Analyze a chart image and return direction and confidence."""
         if not self.enabled:
             return {"error": "Gemini API key missing. Set GEMINI_API_KEY in environment."}
 
         try:
-            # Encode image to base64
-            b64 = base64.b64encode(image_bytes).decode('utf-8')
-            # Construct prompt
-            prompt = (
-                "Analyze this candlestick chart. Identify patterns (engulfing, doji, head and shoulders, etc.). "
-                "Give direction (bullish, bearish, or neutral) and a confidence score (0-100). "
-                "Respond in JSON format: {\"direction\": \"bullish\", \"confidence\": 85, \"patterns\": [\"Bullish Engulfing\"]}"
-            )
-            # Gemini expects image as a PIL Image or bytes
-            import PIL.Image
-            import io
             image = PIL.Image.open(io.BytesIO(image_bytes))
+            
+            # Enhanced prompt for detailed analysis
+            prompt = (
+                "Analyze this candlestick chart and provide a detailed trading signal. "
+                "Respond in valid JSON format with the following fields:\n"
+                "{\n"
+                "  \"direction\": \"BUY\" or \"SELL\" or \"NEUTRAL\",\n"
+                "  \"confidence\": 0-100 (integer),\n"
+                "  \"patterns\": [\"list of detected patterns\"],\n"
+                "  \"setup_grade\": \"A\", \"B\", or \"C\" (A = highest confluence),\n"
+                "  \"risk_reward\": \"2.7\" (example ratio),\n"
+                "  \"entry\": \"4411.96\" (key price),\n"
+                "  \"take_profit\": \"4393.65\",\n"
+                "  \"stop_loss\": \"4420.07\",\n"
+                "  \"invalidation\": \"Candle close above 4420.07\",\n"
+                "  \"explanation\": \"Brief reason for the signal (1-2 sentences)\"\n"
+                "}\n"
+                "If any field is not applicable, use null. Be concise and professional."
+            )
             
             response = self.model.generate_content([prompt, image])
             response_text = response.text.strip()
-            
-            # Try to parse JSON
-            import json
+
+            # Parse JSON from response
             try:
-                # Find JSON block in response
+                # Extract JSON block
                 start = response_text.find('{')
                 end = response_text.rfind('}') + 1
                 if start != -1 and end != -1:
                     json_str = response_text[start:end]
                     data = json.loads(json_str)
-                    direction = data.get('direction', 'neutral')
-                    confidence = data.get('confidence', 50)
-                    patterns = data.get('patterns', [])
+                    # Ensure required fields exist
                     return {
-                        "direction": direction,
-                        "confidence": confidence,
-                        "patterns": patterns,
+                        "direction": data.get("direction", "NEUTRAL"),
+                        "confidence": data.get("confidence", 50),
+                        "patterns": data.get("patterns", []),
+                        "setup_grade": data.get("setup_grade", "B"),
+                        "risk_reward": data.get("risk_reward", "N/A"),
+                        "entry": data.get("entry", None),
+                        "take_profit": data.get("take_profit", None),
+                        "stop_loss": data.get("stop_loss", None),
+                        "invalidation": data.get("invalidation", None),
+                        "explanation": data.get("explanation", "No explanation provided."),
                         "raw": response_text
                     }
                 else:
                     # Fallback: parse plain text
-                    direction = "neutral"
+                    direction = "NEUTRAL"
                     confidence = 50
                     if "bullish" in response_text.lower():
-                        direction = "bullish"
+                        direction = "BUY"
                     elif "bearish" in response_text.lower():
-                        direction = "bearish"
+                        direction = "SELL"
                     return {
                         "direction": direction,
                         "confidence": confidence,
                         "patterns": [],
+                        "setup_grade": "B",
+                        "risk_reward": "N/A",
+                        "entry": None,
+                        "take_profit": None,
+                        "stop_loss": None,
+                        "invalidation": None,
+                        "explanation": response_text[:200],
                         "raw": response_text
                     }
             except Exception as e:
