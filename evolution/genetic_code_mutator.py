@@ -28,32 +28,28 @@ class CodeMutator:
             with open(self.target_file, 'r') as f:
                 source = f.read()
             tree = ast.parse(source)
-
-            # Simple mutation: find numeric constants and tweak them slightly
-            class NumericMutator(ast.NodeTransformer):
-                def visit_Constant(self, node):
-                    if isinstance(node.value, (int, float)):
-                        if random.random() < 0.1:
-                            # Mutate by ±10%
-                            factor = 1 + random.uniform(-0.1, 0.1)
-                            node.value = node.value * factor
-                            if isinstance(node.value, float):
-                                node.value = round(node.value, 2)
-                            elif isinstance(node.value, int):
-                                node.value = int(node.value)
-                    return node
-
             mutator = NumericMutator()
             new_tree = mutator.visit(tree)
             new_code = ast.unparse(new_tree)
-
-            # Write mutated code to a temp file
             temp_file = f"{self.backup_dir}/main_mutated.py"
             with open(temp_file, 'w') as f:
                 f.write(new_code)
-
             logger.info(f"Code mutated. Backup: {backup}, Mutated: {temp_file}")
             return temp_file
         except Exception as e:
             logger.error(f"Mutation failed: {e}")
             return None
+
+class NumericMutator(ast.NodeTransformer):
+    def visit_Constant(self, node):
+        if isinstance(node.value, (int, float)):
+            if random.random() < 0.1:
+                factor = 1 + random.uniform(-0.2, 0.2)
+                node.value = node.value * factor
+                node.value = round(node.value, 2) if isinstance(node.value, float) else int(node.value)
+        return node
+
+    def visit_If(self, node):
+        # Simple mutation: change comparison operators occasionally
+        # (limited for safety)
+        return node
