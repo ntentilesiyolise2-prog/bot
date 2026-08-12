@@ -5,6 +5,7 @@ import json
 
 router = APIRouter()
 
+# --- Schemas ---
 class TradeRequest(BaseModel):
     symbol: str
     side: str
@@ -46,7 +47,6 @@ async def update_settings(settings: dict):
         json.dump(settings, f, indent=4)
     app = router.app
     app.state.config = settings
-    # Reinit auto‑trade state
     app.state.engine.auto_trade_enabled = settings.get('ai', {}).get('auto_trade', True)
     return {"status": "updated"}
 
@@ -73,31 +73,6 @@ async def get_positions():
     app = router.app
     broker = app.state.execution_core.broker
     return {"positions": getattr(broker, 'positions', [])}
-
-# --- Advanced Vision & AI Routes ---
-@router.post("/api/analyze_chart")
-async def analyze_chart(file: UploadFile = File(...)):
-    app = router.app
-    try:
-        from ai.vision.openrouter_scanner import OpenRouterVisionScanner
-        scanner = OpenRouterVisionScanner()
-        image_bytes = await file.read()
-        results = scanner.scan(image_bytes)
-        return {"patterns": results}
-    except Exception as e:
-        return {"error": str(e)}
-
-@router.post("/api/assistant/query")
-async def assistant_query(query: QueryRequest):
-    app = router.app
-    try:
-        from ai.assistant.rag_engine import RAGAssistant
-        assistant = RAGAssistant()
-        await assistant.initialize()
-        answer = await assistant.query(query.question)
-        return {"answer": answer}
-    except Exception as e:
-        return {"answer": f"Error: {str(e)}"}
 
 # --- Symbol Management ---
 from data.symbol_info import SymbolInfo
@@ -132,6 +107,83 @@ async def remove_symbol(symbol: str):
         return {"status": "removed", "symbol": symbol}
     return {"status": "failed", "symbol": symbol}
 
+# --- Vision (Gemini) ---
+@router.post("/api/analyze_chart")
+async def analyze_chart(file: UploadFile = File(...)):
+    app = router.app
+    try:
+        image_bytes = await file.read()
+        # Use the scanner (which now uses Gemini)
+        result = await app.state.scanner.scan_image(image_bytes, "BTCUSD", "M15")
+        return {"patterns": result}
+    except Exception as e:
+        return {"error": str(e)}
+
+# --- Assistant (RAG + Groq) ---
+@router.post("/api/assistant/query")
+async def assistant_query(query: QueryRequest):
+    app = router.app
+    try:
+        from ai.assistant.rag_engine import RAGAssistant
+        assistant = RAGAssistant()
+        await assistant.initialize()
+        answer = await assistant.query(query.question)
+        return {"answer": answer}
+    except Exception as e:
+        return {"answer": f"Error: {str(e)}"}
+
+# --- Learning Mode ---
+from ai.learning.lesson_db import LESSONS, LessonManager
+
+@router.get("/api/learning/lessons")
+async def get_lessons(level: str = "beginner"):
+    return LESSONS.get(level, [])
+
+@router.get("/api/learning/next")
+async def get_next_lesson(level: str, current_id: int):
+    manager = LessonManager()
+    next_lesson = manager.get_next_lesson(level, current_id)
+    if next_lesson:
+        return next_lesson
+    return {"message": "No more lessons"}
+
+@router.post("/api/learning/complete")
+async def mark_complete(user_id: str, lesson_id: int):
+    manager = LessonManager()
+    progress = manager.mark_complete(user_id, lesson_id)
+    return progress
+
+# --- Comparison (Bot vs Human) ---
+@router.get("/api/comparison")
+async def get_comparison():
+    from utils.journal import TradeJournal
+    journal = TradeJournal()
+    trades = journal.get_trades(days=30)
+    human_trades = [t for t in trades if t.get('source') == 'human']
+    bot_trades = [t for t in trades if t.get('source') == 'bot']
+    def calc(trades_list):
+        if not trades_list:
+            return {"win_rate": 0, "total_pnl": 0, "avg_pnl": 0, "count": 0}
+        import pandas as pd
+        df = pd.DataFrame(trades_list)
+        win_rate = (df['pnl'] > 0).mean() * 100
+        total_pnl = df['pnl'].sum()
+        avg_pnl = df['pnl'].mean()
+        return {"win_rate": round(win_rate,1), "total_pnl": round(total_pnl,2), "avg_pnl": round(avg_pnl,2), "count": len(df)}
+    human = calc(human_trades)
+    bot = calc(bot_trades)
+    return {
+        "human_win_rate": human["win_rate"],
+        "bot_win_rate": bot["win_rate"],
+        "human_total_pnl": human["total_pnl"],
+        "bot_total_pnl": bot["total_pnl"],
+        "human_avg_pnl": human["avg_pnl"],
+        "bot_avg_pnl": bot["avg_pnl"],
+        "human_count": human["count"],
+        "bot_count": bot["count"],
+        "difference": round(bot["total_pnl"] - human["total_pnl"], 2)
+    }
+
 # --- Recovery Mode ---
 @router.get("/api/recovery/status")
 async def get_recovery_status():
@@ -152,3 +204,26 @@ async def send_briefing():
     app = router.app
     await app.state.daily_briefing.generate()
     return {"status": "briefing_sent"}
+
+# --- Correlation Matrix ---
+@router.get("/api/correlation")
+async def get_correlation():
+    app = router.app
+    symbols = app.state.config.get('symbols', ['BTCUSD', 'EURUSD', 'GOLD'])
+    data = {}
+    for sym in symbols:
+        df = await app.state.data_fabric.get_candles(sym, "D1", limit=100)
+        if not df.empty:
+            data[sym] = df['Close'].pct_change()
+    import pandas as pd
+    df = pd.DataFrame(data)
+    corr = df.corr().round(2)
+    return corr.to_dict()
+
+# --- Brain Visualisation (Feature Importance) ---
+@router.get("/api/brain/feature_importance")
+async def get_feature_importance():
+    from ai.models.xgboost_model import XGBoostModel
+    model = XGBoostModel()
+    importance = model.get_feature_importance()
+    return {"features": importance}
