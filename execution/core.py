@@ -15,16 +15,16 @@ class ExecutionCore:
         self.config = config
         self.primary_broker = None
         self.simulator = Simulator()
-        self.broker = None  # active broker
+        self.broker = None
         self.idempotency_cache = set()
         self.journal = TradeJournal()
         self._initialized = False
+        self.correlation_cache = {}
 
     async def initialize(self):
         if self._initialized:
             return
 
-        # Determine primary broker
         if self.config['execution']['paper_trading']:
             self.primary_broker = self.simulator
         else:
@@ -36,11 +36,10 @@ class ExecutionCore:
             else:
                 raise ValueError(f"Unsupported broker: {broker_type}")
 
-        # Try connecting to primary broker
         try:
             await self.primary_broker.connect()
             self.broker = self.primary_broker
-            logger.info(f"Connected to primary broker: {self.config['execution']['broker']}")
+            logger.info(f"Connected to primary broker")
         except Exception as e:
             logger.warning(f"Failed to connect to primary broker: {e}. Falling back to simulator.")
             await self.simulator.connect()
@@ -54,27 +53,30 @@ class ExecutionCore:
             await self.broker.disconnect()
         logger.info("ExecutionCore shutdown.")
 
-    # ========== SMART ORDER ROUTING ==========
+    # ========== SMART ORDER ROUTING + TIMEOUT + PARTIAL FILL ==========
     async def execute_order(self, order):
-        """
-        Place an order with smart routing:
-        - Try primary broker.
-        - If it fails, fall back to simulator.
-        """
         order_id = str(uuid.uuid4())
         if order_id in self.idempotency_cache:
             return {"status": "duplicate", "order_id": order_id}
         self.idempotency_cache.add(order_id)
 
-        # Ensure we have an active broker
         if self.broker is None:
             await self.initialize()
 
-        # Try primary broker
+        # Correlation risk check
+        if self.config['risk']['auto_hedge']:
+            corr = await self._get_correlation(order['symbol'])
+            if corr > self.config['risk']['correlation_threshold']:
+                logger.warning(f"Correlation {corr:.2f} too high for {order['symbol']}. Reducing lot by 50%.")
+                order['lot'] *= 0.5
+
+        # Execute with timeout
         try:
-            result = await self._execute_with_retry(self.broker, order)
+            result = await asyncio.wait_for(
+                self._execute_with_retry(self.broker, order),
+                timeout=self.config['execution']['order_timeout_sec']
+            )
             if result.get('status') == 'executed':
-                # Save to journal
                 self.journal.add_trade({
                     'symbol': order['symbol'],
                     'side': order['side'],
@@ -85,12 +87,21 @@ class ExecutionCore:
                     'order_id': order_id,
                     'status': 'open'
                 })
-                logger.info(f"✅ Order executed: {order['symbol']} {order['side']}")
+                # Check for partial fill
+                if result.get('filled_lot', 0) < order['lot']:
+                    remaining = order['lot'] - result['filled_lot']
+                    logger.warning(f"Partial fill. Remaining {remaining} lots. Sending new order.")
+                    new_order = order.copy()
+                    new_order['lot'] = remaining
+                    await self.execute_order(new_order)
                 return result
             else:
-                logger.warning(f"Primary broker failed: {result}. Falling back to simulator.")
-        except Exception as e:
-            logger.error(f"Primary broker error: {e}. Falling back to simulator.")
+                logger.warning(f"Order failed. Falling back to simulator.")
+        except asyncio.TimeoutError:
+            logger.error(f"Order timed out after {self.config['execution']['order_timeout_sec']}s.")
+            # Cancel pending order on broker (if possible)
+            await self.broker.cancel_order(order_id)
+            return {"status": "failed", "error": "Timeout"}
 
         # Fallback to simulator
         try:
@@ -109,10 +120,7 @@ class ExecutionCore:
                     'order_id': order_id,
                     'status': 'open'
                 })
-                logger.info(f"✅ Simulated order executed: {order['symbol']} {order['side']}")
                 return result
-            else:
-                return {"status": "failed", "error": "All brokers failed"}
         except Exception as e:
             logger.error(f"Fallback simulator error: {e}")
             return {"status": "failed", "error": str(e)}
@@ -123,27 +131,27 @@ class ExecutionCore:
                 result = await broker.place_order(order)
                 if result.get('status') in ['executed', 'rejected']:
                     return result
-                # If not executed, wait and retry
-                await asyncio.sleep(2 ** attempt)  # exponential backoff
+                await asyncio.sleep(2 ** attempt)
             except Exception as e:
                 logger.warning(f"Order attempt {attempt+1} failed: {e}")
                 await asyncio.sleep(2 ** attempt)
         return {"status": "failed", "error": "Max retries exceeded"}
 
-    # ========== POSITION MANAGEMENT ==========
+    async def _get_correlation(self, symbol):
+        # Simplified: fetch recent returns and compute correlation with open positions
+        # In full implementation, use the correlation matrix endpoint
+        return 0.0  # Placeholder
+
     async def update_sl_tp(self, symbol, sl=None, tp=None):
-        """Update stop loss and take profit for an open position."""
         if self.broker:
             return await self.broker.update_sl_tp(symbol, sl, tp)
         return {"status": "failed", "error": "No active broker"}
 
     async def flatten_all(self):
-        """Close all open positions (panic)."""
         if self.broker:
             return await self.broker.flatten_all()
         return {"status": "failed", "error": "No active broker"}
 
-    # ========== GETTERS ==========
     def get_positions(self):
         if self.broker and hasattr(self.broker, 'positions'):
             return self.broker.positions
