@@ -11,28 +11,33 @@ logger = setup_logger(__name__)
 
 class HierarchicalSwarm:
     def __init__(self, window=50):
-        # Layer 1: Scalping (M1)
         self.scalp_strategies = [MomentumStrategy(), MeanReversionStrategy()]
-        # Layer 2: Day Trading (M15/M30)
         self.day_strategies = [TrendStrategy(), BreakoutStrategy()]
-        # Layer 3: Swing Trading (H4)
         self.swing_strategies = [TrendStrategy(), MeanReversionStrategy()]
-        # Layer 4: Position Trading (D1)
         self.position_strategies = [TrendStrategy()]
-        
-        # Performance tracking per layer
+
         self.performance = {
             'scalp': deque(maxlen=window),
             'day': deque(maxlen=window),
             'swing': deque(maxlen=window),
             'position': deque(maxlen=window)
         }
-        self.weights = {
-            'scalp': 0.25,
-            'day': 0.25,
-            'swing': 0.25,
-            'position': 0.25
-        }
+        self.weights = self._load_weights()
+        self.regime = 'neutral'
+        self.last_update = None
+
+    def _load_weights(self):
+        try:
+            import json
+            with open('strategy_weights.json', 'r') as f:
+                return json.load(f)
+        except:
+            return {'scalp': 0.25, 'day': 0.35, 'swing': 0.25, 'position': 0.15}
+
+    def _save_weights(self):
+        import json
+        with open('strategy_weights.json', 'w') as f:
+            json.dump(self.weights, f, indent=4)
 
     def update_performance(self, layer, pnl):
         if layer in self.performance:
@@ -53,24 +58,32 @@ class HierarchicalSwarm:
         if total > 0:
             for layer in self.weights:
                 self.weights[layer] /= total
+        self._save_weights()
+
+    def set_regime(self, regime):
+        self.regime = regime
+        # Adjust weights based on regime
+        if regime == 'trending':
+            self.weights['day'] *= 1.2
+            self.weights['swing'] *= 1.2
+        elif regime == 'choppy':
+            self.weights['scalp'] *= 1.3
+            self.weights['day'] *= 0.7
+        elif regime == 'volatile':
+            self.weights['scalp'] *= 0.6
+            self.weights['day'] *= 0.8
+        # Normalize
+        total = sum(self.weights.values())
+        if total > 0:
+            for layer in self.weights:
+                self.weights[layer] /= total
 
     def get_votes(self, df):
-        # df contains multiple timeframes stacked (we need to parse)
-        # For simplicity, we assume we have a multi-index or separate calls.
-        # We'll implement logic assuming df is the M15 data.
-        # In a full implementation, you'd pass timeframes separately.
-        # Here's the unified logic:
-        signals = {}
-        # 1. Scalp signal (M1 – use recent volatility)
         scalp_votes = [s.get_signal(df) for s in self.scalp_strategies]
-        # 2. Day signal (M15)
         day_votes = [s.get_signal(df) for s in self.day_strategies]
-        # 3. Swing signal (H4 – simulated from M15)
         swing_votes = [s.get_signal(df) for s in self.swing_strategies]
-        # 4. Position signal (D1 – simulated from M15)
         position_votes = [s.get_signal(df) for s in self.position_strategies]
 
-        # Weighted aggregation
         buy_weight = 0
         sell_weight = 0
         layers = {
