@@ -18,17 +18,11 @@ from risk.recovery_mode import RecoveryMode
 from execution.core import ExecutionCore
 from api.routes import router as api_router
 from api.websocket import websocket_handler
-from api.voice_commands import router as voice_router
-from api.learning_routes import router as learning_router
-from api.comparison import router as comparison_router
-from api.brain_visualisation import router as brain_router
-from api.correlation import router as correlation_router
-from api.import_export import router as import_export_router
-from api.status import router as status_router
 from engine.core import TradingEngine
-from engine.scheduler import schedule_nightly
+from engine.latency_arbitrage import LatencyArbitrage
+from engine.market_maker import MarketMaker
 from utils.telegram import TelegramBot
-from utils.daily_briefing import DailyBriefing
+from utils.journal import TradeJournal
 from utils.logger import setup_logger
 
 load_dotenv()
@@ -36,7 +30,6 @@ logger = setup_logger("main")
 
 app = FastAPI(title="NEXUS INFINITUM", version="3.0.0")
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -45,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load config
 with open('config.json', 'r') as f:
     config = json.load(f)
 
@@ -62,19 +54,14 @@ app.state.circuit_breaker = CircuitBreaker(
 app.state.recovery_mode = RecoveryMode(app.state.circuit_breaker)
 app.state.execution_core = ExecutionCore(config)
 app.state.telegram = TelegramBot()
+app.state.journal = TradeJournal()
 app.state.engine = TradingEngine(app.state)
-app.state.daily_briefing = DailyBriefing(app.state)
+app.state.latency_arb = LatencyArbitrage(app.state)
+app.state.market_maker = MarketMaker(app.state)
 app.state.start_time = datetime.utcnow()
 
 # --- API Routers ---
 app.include_router(api_router)
-app.include_router(voice_router)
-app.include_router(learning_router)
-app.include_router(comparison_router)
-app.include_router(brain_router)
-app.include_router(correlation_router)
-app.include_router(import_export_router)
-app.include_router(status_router)
 app.add_api_websocket_route("/ws", websocket_handler)
 
 # --- Serve Frontend ---
@@ -82,14 +69,15 @@ frontend_path = Path(__file__).parent / "frontend"
 if frontend_path.exists():
     app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
-# --- Lifecycle ---
 @app.on_event("startup")
 async def startup():
     logger.info("🚀 Starting NEXUS INFINITUM v3.0...")
     await app.state.data_fabric.initialize()
     await app.state.execution_core.initialize()
     await app.state.engine.start()
-    schedule_nightly(app.state)
+    await app.state.market_maker.start()
+    # Start latency arbitrage monitor
+    asyncio.create_task(app.state.latency_arb.monitor())
     logger.info("✅ All systems ready. Engine is running.")
 
 @app.on_event("shutdown")
@@ -97,7 +85,7 @@ async def shutdown():
     logger.info("Shutting down...")
     await app.state.engine.stop()
     await app.state.execution_core.shutdown()
-    logger.info("👋 Goodbye.")
+    await app.state.market_maker.stop()
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
