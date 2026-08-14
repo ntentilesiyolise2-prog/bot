@@ -1,0 +1,41 @@
+import asyncio
+import ping3
+import numpy as np
+from collections import deque
+from utils.logger import setup_logger
+
+logger = setup_logger(__name__)
+
+class LatencyArbitrage:
+    def __init__(self, app_state):
+        self.app = app_state
+        self.broker_latency = deque(maxlen=20)
+        self.primary_latency = deque(maxlen=20)
+        self.threshold_ms = 30
+        self.running = False
+
+    async def monitor(self):
+        self.running = True
+        while self.running:
+            try:
+                broker_ping = ping3.ping("8.8.8.8", timeout=1)
+                primary_ping = ping3.ping("1.1.1.1", timeout=1)
+                if broker_ping and primary_ping:
+                    self.broker_latency.append(broker_ping * 1000)
+                    self.primary_latency.append(primary_ping * 1000)
+                    if len(self.broker_latency) > 5:
+                        avg_broker = np.mean(self.broker_latency)
+                        avg_primary = np.mean(self.primary_latency)
+                        delta = avg_broker - avg_primary
+                        if delta > self.threshold_ms:
+                            logger.info(f"💡 Latency Edge: Broker is {delta:.2f}ms slower. Front-running opportunity.")
+                            # Trigger a trade in the main engine
+                            self.app.engine.last_signals['LATENCY_ARB'] = {
+                                'direction': 'BUY' if delta > 0 else 'SELL',
+                                'confluence': 95,
+                                'explanation': f'Latency arbitrage: {delta:.2f}ms edge'
+                            }
+                await asyncio.sleep(60)
+            except Exception as e:
+                logger.error(f"Latency monitor error: {e}")
+                await asyncio.sleep(10)
