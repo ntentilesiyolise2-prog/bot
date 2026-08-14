@@ -4,17 +4,20 @@
   "forex_pairs": ["EURUSD", "GBPUSD", "USDJPY"],
   "timeframes": {
     "scalp": ["M1"],
-    "day": ["M15", "M30"],
+    "day": ["M15", "M30", "H1"],
     "swing": ["H4"],
     "position": ["D1"]
   },
+  "session_timezone": "America/New_York",
   "risk": {
     "max_daily_loss": 50.0,
     "max_drawdown_pct": 5.0,
     "risk_per_trade_pct": 2.0,
     "max_consecutive_losses": 3,
     "max_open_positions": 5,
-    "auto_hedge": false
+    "auto_hedge": true,
+    "correlation_threshold": 0.8,
+    "max_hedge_ratio": 0.5
   },
   "execution": {
     "paper_trading": true,
@@ -23,12 +26,24 @@
       "login": 0,
       "password": "",
       "server": ""
-    }
+    },
+    "order_timeout_sec": 5,
+    "retry_attempts": 3
   },
   "ai": {
-    "scanner_interval_sec": 10,
+    "scanner_interval_sec": 15,
     "min_confluence_threshold": 75,
     "auto_trade": true,
-    "scalping_enabled": true
+    "scalping_enabled": true,
+    "funding_rate_threshold": 0.015,
+    "weight_update_interval_min": 15
+  },
+  "journal": {
+    "max_active_trades": 500,
+    "archive_enabled": true
+  },
+  "security": {
+    "api_key_header": "X-API-Key",
+    "api_key": ""
   }
 }
