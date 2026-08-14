@@ -7,6 +7,8 @@ from utils.logger import setup_logger
 from api.websocket import manager
 from .scalper import Scalper
 from .event_intelligence import EventIntelligence
+from ..ai.sentiment.micro_expression import MicroExpressionAnalyzer
+from ..ai.macro.weather_arbitrage import WeatherArbitrage
 
 logger = setup_logger(__name__)
 
@@ -24,6 +26,9 @@ class TradingEngine:
         self.last_weight_update = datetime.utcnow()
         self.session_tz = pytz.timezone(self.app.config.get('session_timezone', 'America/New_York'))
         self.heartbeat_counter = 0
+        # COSMOS Modules
+        self.sentiment_analyzer = MicroExpressionAnalyzer()
+        self.weather_arb = WeatherArbitrage()
 
     async def start(self):
         self.running = True
@@ -34,16 +39,49 @@ class TradingEngine:
         self.tasks.append(asyncio.create_task(self._auto_trade_loop()))
         self.tasks.append(asyncio.create_task(self._heartbeat_check()))
         self.tasks.append(asyncio.create_task(self._update_weights_loop()))
+        self.tasks.append(asyncio.create_task(self._cosmos_sentiment_loop()))
+        self.tasks.append(asyncio.create_task(self._cosmos_weather_loop()))
         await self.scalper.start()
         self.tasks.append(asyncio.create_task(self._event_intelligence_loop()))
-        logger.info("✅ All engine loops are running.")
+        logger.info("✅ All engine loops are running, including COSMOS modules.")
 
-    # ============ HEARTBEAT (Ghost Mode Prevention) ============
+    # ============ COSMOS SENTIMENT LOOP ============
+    async def _cosmos_sentiment_loop(self):
+        while self.running:
+            try:
+                # You can set a URL to a live news anchor image.
+                # For now, we skip if no URL is configured.
+                # This is a placeholder for the actual implementation.
+                # Example: sentiment_score = await self.sentiment_analyzer.analyze_anchor_sentiment("https://example.com/news_anchor.jpg")
+                # bias = self.sentiment_analyzer.get_market_bias()
+                # if bias == "BULLISH":
+                #     self.last_signals['SENTIMENT'] = {'direction': 'BUY', 'confluence': 85, 'explanation': 'Anchor sentiment bullish'}
+                # elif bias == "BEARISH":
+                #     self.last_signals['SENTIMENT'] = {'direction': 'SELL', 'confluence': 85, 'explanation': 'Anchor sentiment bearish'}
+                await asyncio.sleep(300)  # check every 5 minutes
+            except Exception as e:
+                logger.error(f"Sentiment loop error: {e}")
+                await asyncio.sleep(60)
+
+    # ============ COSMOS WEATHER LOOP ============
+    async def _cosmos_weather_loop(self):
+        while self.running:
+            try:
+                temp = await self.weather_arb.get_forecast()
+                signal = self.weather_arb.get_trade_signal(temp)
+                if signal:
+                    self.last_signals['WEATHER'] = signal
+                    logger.info(f"Weather signal: {signal}")
+                await asyncio.sleep(3600)  # check every hour
+            except Exception as e:
+                logger.error(f"Weather loop error: {e}")
+                await asyncio.sleep(600)
+
+    # ============ HEARTBEAT ============
     async def _heartbeat_check(self):
         while self.running:
-            await asyncio.sleep(300)  # every 5 minutes
+            await asyncio.sleep(300)
             try:
-                # Send a dummy order (0.001 lot) to check broker connectivity
                 test_order = {'symbol': 'EURUSD', 'side': 'BUY', 'lot': 0.001}
                 result = await self.app.execution_core.execute_order(test_order)
                 if result.get('status') == 'failed':
@@ -54,7 +92,7 @@ class TradingEngine:
                 logger.error(f"Heartbeat error: {e}")
                 self.auto_trade_enabled = False
 
-    # ============ WEIGHT UPDATE (Every 15 min) ============
+    # ============ WEIGHT UPDATE ============
     async def _update_weights_loop(self):
         while self.running:
             await asyncio.sleep(self.app.config['ai']['weight_update_interval_min'] * 60)
@@ -73,7 +111,7 @@ class TradingEngine:
         with open('strategy_weights.json', 'w') as f:
             json.dump(weights, f, indent=4)
 
-    # ============ BROADCAST PRICES (unchanged) ============
+    # ============ BROADCAST PRICES ============
     async def _broadcast_prices(self):
         while self.running:
             try:
@@ -101,7 +139,7 @@ class TradingEngine:
                 logger.error(f"Price broadcast error: {e}")
                 await asyncio.sleep(5)
 
-    # ============ SCANNER (with Z-score and Funding Rate) ============
+    # ============ SCANNER ============
     async def _run_scanner(self):
         while self.running:
             try:
@@ -114,7 +152,7 @@ class TradingEngine:
                     if 'BTC' in symbol or 'ETH' in symbol:
                         funding = await self._get_funding_rate(symbol)
                         if funding > self.app.config['ai']['funding_rate_threshold'] and result['direction'] == 'BUY':
-                            result['confluence'] *= 0.5  # reduce confidence
+                            result['confluence'] *= 0.5
                             result['explanation'] += f" (Funding high {funding:.4f}, BUY reduced)"
                     signal = {
                         "type": "signal",
@@ -147,11 +185,10 @@ class TradingEngine:
         except:
             return 0.0
 
-    # ============ RISK MONITOR (EWMA VaR + Timezone reset) ============
+    # ============ RISK MONITOR ============
     async def _monitor_risk(self):
         while self.running:
             try:
-                # Timezone-based daily loss reset
                 now_ny = datetime.now(self.session_tz)
                 if now_ny.hour == 0 and now_ny.minute == 0:
                     self.app.risk_engine.reset_daily()
@@ -190,17 +227,25 @@ class TradingEngine:
                     await asyncio.sleep(5)
                     continue
 
+                # Check all signals, including COSMOS (latency, sentiment, weather)
                 for symbol, signal in self.last_signals.items():
                     if signal is None:
                         continue
                     confluence = signal.get('confluence', 0)
                     direction = signal.get('direction')
                     min_conf = self.app.config['ai']['min_confluence_threshold']
+                    # For COSMOS signals, we may have lower thresholds
+                    if symbol in ['LATENCY_ARB', 'SENTIMENT', 'WEATHER']:
+                        min_conf = 80  # Higher trust for cosmic signals
                     if confluence >= min_conf and direction in ['BUY', 'SELL']:
                         trade_key = f"{symbol}_{direction}"
                         if self._last_trade_time == trade_key:
                             continue
-                        trade = {'symbol': symbol, 'side': direction, 'lot': 0.01}
+                        # Determine lot size
+                        lot = 0.01
+                        if symbol in ['LATENCY_ARB', 'SENTIMENT', 'WEATHER']:
+                            lot = 0.02  # double size for cosmic signals
+                        trade = {'symbol': symbol, 'side': direction, 'lot': lot}
                         ok, msg = self.app.risk_engine.check_risk(trade)
                         if not ok:
                             logger.info(f"Risk blocked {symbol}: {msg}")
@@ -210,9 +255,9 @@ class TradingEngine:
                             pnl = result.get('pnl', 0.5)
                             self.app.strategy_swarm.update_performance('day', pnl)
                             await self.app.telegram.send_message(
-                                f"🤖 Auto-Trade: {direction} {symbol} 0.01 lots @ {result.get('price', 'market')}"
+                                f"🤖 Auto-Trade: {direction} {symbol} {lot} lots @ {result.get('price', 'market')} (COSMOS)"
                             )
-                            logger.info(f"✅ Auto-trade executed: {direction} {symbol}")
+                            logger.info(f"✅ COSMOS trade executed: {direction} {symbol}")
                             self.last_signals[symbol] = None
                             self._last_trade_time = trade_key
                         else:
