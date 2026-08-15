@@ -7,8 +7,19 @@ from utils.logger import setup_logger
 from api.websocket import manager
 from .scalper import Scalper
 from .event_intelligence import EventIntelligence
-from ..ai.sentiment.micro_expression import MicroExpressionAnalyzer
-from ..ai.macro.weather_arbitrage import WeatherArbitrage
+
+# --- COSMOS Imports with Graceful Fallback ---
+try:
+    from ..ai.sentiment.micro_expression import MicroExpressionAnalyzer
+except ImportError:
+    MicroExpressionAnalyzer = None
+    print("⚠️ MicroExpressionAnalyzer disabled (tensorflow not installed)")
+
+try:
+    from ..ai.macro.weather_arbitrage import WeatherArbitrage
+except ImportError:
+    WeatherArbitrage = None
+    print("⚠️ WeatherArbitrage disabled (aiohttp missing?)")
 
 logger = setup_logger(__name__)
 
@@ -26,9 +37,11 @@ class TradingEngine:
         self.last_weight_update = datetime.utcnow()
         self.session_tz = pytz.timezone(self.app.config.get('session_timezone', 'America/New_York'))
         self.heartbeat_counter = 0
-        # COSMOS Modules
-        self.sentiment_analyzer = MicroExpressionAnalyzer()
-        self.weather_arb = WeatherArbitrage()
+
+        # COSMOS Modules (only if dependencies are installed)
+        self.sentiment_analyzer = MicroExpressionAnalyzer() if MicroExpressionAnalyzer else None
+        self.weather_arb = WeatherArbitrage() if WeatherArbitrage else None
+        logger.info("TradingEngine initialized.")
 
     async def start(self):
         self.running = True
@@ -43,28 +56,27 @@ class TradingEngine:
         self.tasks.append(asyncio.create_task(self._cosmos_weather_loop()))
         await self.scalper.start()
         self.tasks.append(asyncio.create_task(self._event_intelligence_loop()))
-        logger.info("✅ All engine loops are running, including COSMOS modules.")
+        logger.info("✅ All engine loops are running.")
 
     # ============ COSMOS SENTIMENT LOOP ============
     async def _cosmos_sentiment_loop(self):
+        if not self.sentiment_analyzer:
+            logger.info("Sentiment loop disabled (dependency missing).")
+            return
         while self.running:
             try:
-                # You can set a URL to a live news anchor image.
+                # Placeholder – you can set a URL to a live news anchor image.
                 # For now, we skip if no URL is configured.
-                # This is a placeholder for the actual implementation.
-                # Example: sentiment_score = await self.sentiment_analyzer.analyze_anchor_sentiment("https://example.com/news_anchor.jpg")
-                # bias = self.sentiment_analyzer.get_market_bias()
-                # if bias == "BULLISH":
-                #     self.last_signals['SENTIMENT'] = {'direction': 'BUY', 'confluence': 85, 'explanation': 'Anchor sentiment bullish'}
-                # elif bias == "BEARISH":
-                #     self.last_signals['SENTIMENT'] = {'direction': 'SELL', 'confluence': 85, 'explanation': 'Anchor sentiment bearish'}
-                await asyncio.sleep(300)  # check every 5 minutes
+                await asyncio.sleep(300)
             except Exception as e:
                 logger.error(f"Sentiment loop error: {e}")
                 await asyncio.sleep(60)
 
     # ============ COSMOS WEATHER LOOP ============
     async def _cosmos_weather_loop(self):
+        if not self.weather_arb:
+            logger.info("Weather loop disabled (dependency missing).")
+            return
         while self.running:
             try:
                 temp = await self.weather_arb.get_forecast()
@@ -72,7 +84,7 @@ class TradingEngine:
                 if signal:
                     self.last_signals['WEATHER'] = signal
                     logger.info(f"Weather signal: {signal}")
-                await asyncio.sleep(3600)  # check every hour
+                await asyncio.sleep(3600)
             except Exception as e:
                 logger.error(f"Weather loop error: {e}")
                 await asyncio.sleep(600)
@@ -148,7 +160,6 @@ class TradingEngine:
                     if df.empty:
                         continue
                     result = self.app.strategy_swarm.get_votes(df)
-                    # Funding rate filter for crypto
                     if 'BTC' in symbol or 'ETH' in symbol:
                         funding = await self._get_funding_rate(symbol)
                         if funding > self.app.config['ai']['funding_rate_threshold'] and result['direction'] == 'BUY':
@@ -227,24 +238,19 @@ class TradingEngine:
                     await asyncio.sleep(5)
                     continue
 
-                # Check all signals, including COSMOS (latency, sentiment, weather)
                 for symbol, signal in self.last_signals.items():
                     if signal is None:
                         continue
                     confluence = signal.get('confluence', 0)
                     direction = signal.get('direction')
                     min_conf = self.app.config['ai']['min_confluence_threshold']
-                    # For COSMOS signals, we may have lower thresholds
                     if symbol in ['LATENCY_ARB', 'SENTIMENT', 'WEATHER']:
-                        min_conf = 80  # Higher trust for cosmic signals
+                        min_conf = 80
                     if confluence >= min_conf and direction in ['BUY', 'SELL']:
                         trade_key = f"{symbol}_{direction}"
                         if self._last_trade_time == trade_key:
                             continue
-                        # Determine lot size
-                        lot = 0.01
-                        if symbol in ['LATENCY_ARB', 'SENTIMENT', 'WEATHER']:
-                            lot = 0.02  # double size for cosmic signals
+                        lot = 0.01 if symbol not in ['LATENCY_ARB', 'SENTIMENT', 'WEATHER'] else 0.02
                         trade = {'symbol': symbol, 'side': direction, 'lot': lot}
                         ok, msg = self.app.risk_engine.check_risk(trade)
                         if not ok:
@@ -255,9 +261,9 @@ class TradingEngine:
                             pnl = result.get('pnl', 0.5)
                             self.app.strategy_swarm.update_performance('day', pnl)
                             await self.app.telegram.send_message(
-                                f"🤖 Auto-Trade: {direction} {symbol} {lot} lots @ {result.get('price', 'market')} (COSMOS)"
+                                f"🤖 Auto-Trade: {direction} {symbol} {lot} lots @ {result.get('price', 'market')}"
                             )
-                            logger.info(f"✅ COSMOS trade executed: {direction} {symbol}")
+                            logger.info(f"✅ Trade executed: {direction} {symbol}")
                             self.last_signals[symbol] = None
                             self._last_trade_time = trade_key
                         else:
